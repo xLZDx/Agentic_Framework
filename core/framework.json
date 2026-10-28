@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "name": "Agentic_Framework",
+  "comment": "Metadata for bundled roles and skills. Core files are tool-agnostic; deploy/ is generated from them for each target. Roles marked external already exist globally for both tools and are only referenced.",
+  "targets": {
+    "claude": {
+      "agent_ext": "md",
+      "model": "sonnet",
+      "effort": "medium",
+      "dest_agents": "agents",
+      "dest_skills": "skills"
+    },
+    "codex": {
+      "agent_ext": "toml",
+      "model": "gpt-6-luna",
+      "effort": "medium",
+      "dest_agents": "agents",
+      "dest_skills": "skills"
+    }
+  },
+  "bundled_agents": [
+    "business-analyst", "product-owner", "ui-designer", "technical-writer", "reporting-analyst", "functional-test-reviewer"
+  ],
+  "external_agents": [
+    "architect", "code-architect", "e2e-runner", "implementation-engineer", "code-reviewer",
+    "security-reviewer", "database-reviewer", "python-reviewer", "silent-failure-hunter", "code-explorer"
+  ],
+  "bundled_skills": [
+    "sdlc-orchestrator", "requirements-elicitation", "backlog-and-dod", "sprint-ceremonies",
+    "ui-design-contract", "release-documentation", "sdlc-metrics", "pm-gpt-review"
+  ],
+  "external_skills": [
+    "technical-design", "architecture-contract", "implementation-workflow", "functional-testing",
+    "e2e-testing-contract", "agent-consensus", "verification-contract"
+  ],
+  "model_policy": {
+    "claude": "Agents use alias sonnet (Sonnet 5.5 minimum), effort medium. Opus is never automatic.",
+    "codex": "Agents use gpt-6-luna, low or medium effort. GPT-5.6 Sol is prohibited for review."
+  }
+}

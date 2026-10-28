@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "comment": "Single source of truth for the SDLC phases. Tool-agnostic: Claude and GPT/Codex read the same map. Edit here, never hard-code roles elsewhere.",
+  "state_dir": "docs/sdlc",
+  "phases": [
+    {"n": 1, "name": "Discovery", "roles": ["business-analyst"], "skills": ["requirements-elicitation"], "artifacts": ["requirements.md"]},
+    {"n": 2, "name": "Backlog", "roles": ["product-owner"], "skills": ["backlog-and-dod"], "artifacts": ["backlog.md"]},
+    {"n": 3, "name": "Design", "roles": ["architect", "code-architect", "ui-designer"], "skills": ["technical-design", "architecture-contract", "ui-design-contract"], "artifacts": ["design.md"]},
+    {"n": 4, "name": "Docs and test plan", "roles": ["technical-writer", "functional-test-reviewer", "e2e-runner"], "skills": ["release-documentation", "functional-testing"], "artifacts": ["test-plan.md"]},
+    {"n": 5, "name": "Doc review", "roles": ["code-reviewer", "architect"], "skills": ["agent-consensus", "pm-gpt-review"], "artifacts": ["review-record.md"],
+     "pm_review": {"kind": "docs", "required": false}},
+    {"n": 6, "name": "Build", "roles": ["implementation-engineer"], "skills": ["implementation-workflow"], "artifacts": ["change-records/*.md"]},
+    {"n": 7, "name": "Verify", "roles": ["functional-test-reviewer", "e2e-runner", "code-reviewer"], "skills": ["functional-testing", "e2e-testing-contract", "agent-consensus"], "artifacts": ["verify-evidence.md"]},
+    {"n": 8, "name": "PM-GPT review and approve", "roles": [], "skills": ["pm-gpt-review"], "artifacts": ["gate-approval.md"],
+     "pm_review": {"kind": "code", "required": true}},
+    {"n": 9, "name": "Accept and release", "roles": ["product-owner", "technical-writer"], "skills": ["release-documentation"], "artifacts": ["acceptance.md"]},
+    {"n": 10, "name": "Report and retro", "roles": ["reporting-analyst"], "skills": ["sdlc-metrics", "sprint-ceremonies"], "artifacts": ["sprint-report.md"]}
+  ],
+  "push_gate": {
+    "blocked_commands": ["git push", "gh pr create", "gh pr merge"],
+    "unlock_phase": 8,
+    "approval_file": "gate-approval.md",
+    "approval_json": ".pm-review/approval.json"
+  },
+  "pm_review": {
+    "review_js_candidates": [
+      "D:\\Repo\\pm-bridge\\src\\cli\\review.js",
+      "D:\\Repo\\pm-bridge-codex\\src\\cli\\review.js"
+    ],
+    "env_override": "AF_PM_REVIEW_JS",
+    "accepted_verdicts": ["APPROVE"],
+    "comment": "Only APPROVE unlocks the push gate. MINOR is reported as a finding list and must be fixed or backlogged, then re-reviewed only if code changed."
+  }
+}
