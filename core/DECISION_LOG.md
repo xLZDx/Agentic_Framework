@@ -12,5 +12,6 @@
 - Toggle: `af_cli.py on|off` (off = paused: no phase injection, no push gate, state kept). Exposed as skill `/af` for Claude (user-invoked only) and prompt `/prompts:af` for Codex, both generated from core/commands/af.md.
 - Evidence: the functional-test-reviewer run (93 tests, 90 passed) found that the push-gate regex blocked any git command containing the word push. Replaced by a tokenising `is_push_command` check.
 - Evidence: full suite 161 tests, 161 OK after fixing a missing bundled role (implementation-engineer, phase 6) and Windows backslash git paths in the push gate.
+- Autostart fallback: schtasks ONLOGON returned "Access is denied" without admin, so register falls back to the per-user HKCU Run key (no elevation). Verified by 165-test run (164 OK, 1 self-skip).
 - Autostart (operator request): tools/af_autostart.py registers a Windows logon task and a VS Code folder-open task that only sync the installed copy; enabling the framework in a project stays `/af on`.
 - Global installation stays opt-in: tools/af_install.py (dry-run, backups, manifest for exact uninstall). The operator chose to install only this framework, not the ADK installer.

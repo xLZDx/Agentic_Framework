@@ -25,6 +25,8 @@ TASK = "AgenticFramework-Autostart"
 LOG = Path.home() / ".claude" / "af-autostart.log"
 VSCODE_TASKS = Path("D:/Repo/.vscode/tasks.json")
 VSCODE_LABEL = "Agentic_Framework autostart"
+RUN_KEY = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run"
+RUN_NAME = "AgenticFrameworkAutostart"
 
 
 def log(msg: str) -> None:
@@ -55,6 +57,11 @@ def cmd_register(_a) -> int:
     r = subprocess.run(["schtasks", "/Create", "/F", "/SC", "ONLOGON", "/TN", TASK, "/TR", tr, "/RL", "LIMITED"],
                        capture_output=True, text=True)
     print((r.stdout or r.stderr).strip())
+    if r.returncode != 0:
+        # schtasks ONLOGON needs admin; fall back to the per-user Run key (no elevation).
+        r = subprocess.run(["reg", "add", RUN_KEY, "/v", RUN_NAME, "/t", "REG_SZ", "/d", tr, "/f"],
+                           capture_output=True, text=True)
+        print("Run key fallback:", (r.stdout or r.stderr).strip())
     return r.returncode
 
 
@@ -81,6 +88,8 @@ def cmd_register_vscode(_a) -> int:
 def cmd_unregister(_a) -> int:
     r = subprocess.run(["schtasks", "/Delete", "/F", "/TN", TASK], capture_output=True, text=True)
     print((r.stdout or r.stderr).strip())
+    r = subprocess.run(["reg", "delete", RUN_KEY, "/v", RUN_NAME, "/f"], capture_output=True, text=True)
+    print("Run key:", (r.stdout or r.stderr).strip())
     if VSCODE_TASKS.is_file():
         data = _load_tasks()
         before = len(data["tasks"])
@@ -94,6 +103,8 @@ def cmd_unregister(_a) -> int:
 def cmd_status(_a) -> int:
     r = subprocess.run(["schtasks", "/Query", "/TN", TASK], capture_output=True, text=True)
     print("Scheduled task:", "present" if r.returncode == 0 else "absent")
+    rk = subprocess.run(["reg", "query", RUN_KEY, "/v", RUN_NAME], capture_output=True, text=True)
+    print("Run key:", "present" if rk.returncode == 0 else "absent")
     has = VSCODE_TASKS.is_file() and any(t.get("label") == VSCODE_LABEL for t in _load_tasks()["tasks"])
     print("VS Code task:", "present" if has else "absent")
     print("Last log lines:")

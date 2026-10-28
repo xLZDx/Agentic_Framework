@@ -81,9 +81,10 @@ class VsCode(Base):
         self.run_mock.return_value = SimpleNamespace(returncode=0, stdout="ok", stderr="")
         self.assertEqual(A.cmd_unregister(None), 0)
         self.assertEqual(self.data()["tasks"], [OTHER])
-        argv = self.run_mock.call_args[0][0]
-        self.assertEqual(argv[:2], ["schtasks", "/Delete"])
-        self.assertIn(A.TASK, argv)
+        argvs = [c[0][0] for c in self.run_mock.call_args_list]
+        self.assertEqual(argvs[0][:2], ["schtasks", "/Delete"])
+        self.assertIn(A.TASK, argvs[0])
+        self.assertEqual(argvs[1][:2], ["reg", "delete"])
 
     def test_unregister_without_file_does_not_create_it(self):
         self.run_mock.side_effect = None
@@ -165,12 +166,66 @@ class Register(Base):
         self.assertIn("af_autostart.py", tr)
         self.assertTrue(tr.endswith(" run"))
         self.assertIn("python", A._pythonw().lower())
-        self.assertEqual(self.run_mock.call_count, 1)
+        self.assertEqual(self.run_mock.call_count, 1)  # schtasks succeeded: no registry fallback
 
-    def test_register_propagates_failure_code(self):
-        self.run_mock.side_effect = None
-        self.run_mock.return_value = SimpleNamespace(returncode=5, stdout="", stderr="denied")
-        self.assertEqual(A.cmd_register(None), 5)
+    def _route(self, results):
+        calls = []
+
+        def fake(argv, **kw):
+            calls.append(argv)
+            rc, out, err = results[argv[0]]
+            return SimpleNamespace(returncode=rc, stdout=out, stderr=err)
+        self.run_mock.side_effect = fake
+        return calls
+
+    def test_register_success_does_not_touch_registry(self):
+        calls = self._route({"schtasks": (0, "SUCCESS", ""), "reg": (0, "", "")})
+        self.assertEqual(A.cmd_register(None), 0)
+        self.assertEqual([c[0] for c in calls], ["schtasks"])
+
+    def test_register_falls_back_to_run_key_only_when_schtasks_fails(self):
+        calls = self._route({"schtasks": (1, "", "ERROR: Access is denied."), "reg": (0, "done", "")})
+        self.assertEqual(A.cmd_register(None), 0)
+        self.assertEqual([c[0] for c in calls], ["schtasks", "reg"])
+        reg = calls[1]
+        self.assertEqual(reg[:2], ["reg", "add"])
+        self.assertEqual(reg[2], A.RUN_KEY)
+        self.assertTrue(A.RUN_KEY.startswith("HKCU"))
+        self.assertTrue(A.RUN_KEY.endswith(r"CurrentVersion\Run"))
+        self.assertEqual(reg[reg.index("/v") + 1], "AgenticFrameworkAutostart")
+        self.assertEqual(reg[reg.index("/t") + 1], "REG_SZ")
+        self.assertIn("/f", reg)
+        data = reg[reg.index("/d") + 1]
+        self.assertEqual(data, calls[0][calls[0].index("/TR") + 1])  # same command as the task
+        self.assertTrue(data.startswith('"' + A._pythonw() + '" "'))
+        self.assertTrue(data.endswith('af_autostart.py" run'))
+
+    def test_register_returns_registry_failure_code_when_both_fail(self):
+        self._route({"schtasks": (1, "", "denied"), "reg": (7, "", "reg denied")})
+        self.assertEqual(A.cmd_register(None), 7)
+
+    def test_status_reports_both_present_and_absent(self):
+        import io
+        from contextlib import redirect_stdout
+        for sc, rk, exp in ((0, 1, ("Scheduled task: present", "Run key: absent")),
+                            (1, 0, ("Scheduled task: absent", "Run key: present")),
+                            (1, 1, ("Scheduled task: absent", "Run key: absent"))):
+            calls = self._route({"schtasks": (sc, "", ""), "reg": (rk, "", "")})
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                self.assertEqual(A.cmd_status(None), 0)
+            for line in exp:
+                self.assertIn(line, buf.getvalue())
+            self.assertEqual([c[:2] for c in calls], [["schtasks", "/Query"], ["reg", "query"]])
+            self.assertEqual(calls[1][calls[1].index("/v") + 1], A.RUN_NAME)
+
+    def test_unregister_issues_both_deletes_even_if_first_fails(self):
+        calls = self._route({"schtasks": (1, "", "not found"), "reg": (0, "", "")})
+        self.assertEqual(A.cmd_unregister(None), 0)
+        self.assertEqual([c[:2] for c in calls], [["schtasks", "/Delete"], ["reg", "delete"]])
+        self.assertEqual(calls[1][2], A.RUN_KEY)
+        self.assertEqual(calls[1][calls[1].index("/v") + 1], A.RUN_NAME)
+        self.assertIn("/f", calls[1])
 
     def test_pythonw_prefers_sibling_when_exists_else_python(self):
         d = H.tmpdir(self)
