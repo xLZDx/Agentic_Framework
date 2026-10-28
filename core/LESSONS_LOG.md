@@ -1,3 +1,7 @@
 # Lessons log (append-only)
 
 - 2026-10-28 initial framework - NEUTRAL: first commit, no defects recorded yet. Tests are authored and run by test agents (see docs/changes).
+- 2026-10-28 import agents, /af toggle - FAILURE (author): the push gate used a substring regex and denied `git commit -m "fix push bug"`, `git log --grep push` and `git stash push`. Evidence: 3 failing subtests in tests/test_hook_githook.py. Root cause: matching text instead of parsing the git subcommand. Caught by the test agent; missed by the author. Rule: match shell gates on parsed tokens (executable, skipped global options, subcommand), never on substrings.
+- 2026-10-28 import agents, /af toggle - FAILURE (author): phase 6 named implementation-engineer, which was not bundled after the framework.json rewrite. Evidence: test_phase_map_roles_and_skills_are_known failed. Root cause: bundled list regenerated from imported files only. Caught by tests. Rule: keep a test that every phase-map role resolves to a bundled agent.
+- 2026-10-28 import agents, /af toggle - SUCCESS: independent test agent found the push-gate defect before any real use; full suite 161/161 after fixes.
+- 2026-10-28 import agents, /af toggle - SHORTCOMING (author): scripted multi-line edits through Python heredocs corrupted string escapes twice. Rule: use the Edit tool for source that has backslashes or newlines in string literals.

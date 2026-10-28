@@ -86,6 +86,33 @@ def _set(args, **kv) -> int:
     return 0
 
 
+def cmd_on(args) -> int:
+    p = _project(args)
+    st = core.read_state(p)
+    if st is None:
+        core.write_state(p, {"title": args.title, "phase": 1, "mode": args.mode, "paused": False, "history": []})
+        print(f"Framework ON: started '{args.title}' at phase 1 ({args.mode}) in {p}")
+        return 0
+    st["paused"] = False
+    if args.mode_given:
+        st["mode"] = args.mode
+    core.write_state(p, st)
+    print(f"Framework ON: resumed at phase {st['phase']} ({st['mode']}) in {p}")
+    return 0
+
+
+def cmd_off(args) -> int:
+    p = _project(args)
+    st = core.read_state(p)
+    if st is None:
+        print("Framework already OFF (no sprint state).")
+        return 0
+    st["paused"] = True
+    core.write_state(p, st)
+    print(f"Framework OFF: paused at phase {st['phase']}; no injection, no push gate. State kept.")
+    return 0
+
+
 def cmd_pm_review(args) -> int:
     return pm_review.request(_project(args), args.kind, args.base, node=args.node, project_id=args.project_id)
 
@@ -147,6 +174,8 @@ def main(argv=None) -> int:
     s = sub.add_parser("mode"); s.add_argument("value", choices=["hard", "soft"]); s.set_defaults(fn=lambda a: _set(a, mode=a.value))
     sub.add_parser("pause").set_defaults(fn=lambda a: _set(a, paused=True))
     sub.add_parser("resume").set_defaults(fn=lambda a: _set(a, paused=False))
+    s = sub.add_parser("on"); s.add_argument("--mode", default=None, choices=["hard", "soft"]); s.add_argument("--title", default="Sprint"); s.set_defaults(fn=cmd_on)
+    sub.add_parser("off").set_defaults(fn=cmd_off)
     s = sub.add_parser("pm-review"); s.add_argument("--kind", choices=list(pm_review.KINDS), default="code"); s.add_argument("--base", required=True); s.add_argument("--node", default="node"); s.add_argument("--project-id"); s.set_defaults(fn=cmd_pm_review)
     s = sub.add_parser("verify"); s.add_argument("--kind", choices=list(pm_review.KINDS), default="code"); s.set_defaults(fn=cmd_verify)
     sub.add_parser("hook").set_defaults(fn=cmd_hook)
@@ -154,6 +183,9 @@ def main(argv=None) -> int:
     sub.add_parser("install-githook").set_defaults(fn=cmd_install_githook)
     sub.add_parser("gate-check").set_defaults(fn=cmd_gate_check)
     args = ap.parse_args(argv)
+    if args.cmd == "on":
+        args.mode_given = args.mode is not None
+        args.mode = args.mode or "hard"
     return args.fn(args)
 
 

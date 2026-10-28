@@ -9,12 +9,39 @@ from __future__ import annotations
 
 import json
 import re
+import shlex
 import sys
 from pathlib import Path
 
 from . import core, pm_review
 
-PUSH_RE = re.compile(r"\bgit\b[^;&|\n]*\bpush\b|\bgh\s+pr\s+(create|merge)\b")
+SEGMENT_RE = re.compile(r"&&|\|\||[;|&\n]")
+GIT_OPTS_WITH_VALUE = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path"}
+
+
+def is_push_command(command: str) -> bool:
+    """True when any shell segment runs `git push`, `gh pr create` or `gh pr merge`."""
+    for seg in SEGMENT_RE.split(command):
+        seg = seg.replace(chr(92), "/")  # Windows paths: shlex would otherwise eat the backslashes
+        try:
+            toks = shlex.split(seg, posix=True)
+        except ValueError:
+            toks = seg.split()
+        while toks and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", toks[0]):
+            toks = toks[1:]
+        if not toks:
+            continue
+        exe = re.split(r"[\\/]", toks[0])[-1].lower().removesuffix(".exe")
+        if exe == "gh" and toks[1:3] and toks[1] == "pr" and toks[2] in ("create", "merge"):
+            return True
+        if exe != "git":
+            continue
+        i = 1
+        while i < len(toks) and toks[i].startswith("-"):
+            i += 2 if toks[i] in GIT_OPTS_WITH_VALUE else 1
+        if i < len(toks) and toks[i] == "push":
+            return True
+    return False
 
 
 def _project(cwd: str) -> Path | None:
@@ -29,7 +56,7 @@ def gate_decision(project: Path, command: str) -> str | None:
     state = core.read_state(project)
     if not state or state.get("mode") != "hard" or state.get("paused"):
         return None
-    if not PUSH_RE.search(command):
+    if not is_push_command(command):
         return None
     cfg = core.load_phase_map()["push_gate"]
     if state["phase"] < cfg["unlock_phase"]:

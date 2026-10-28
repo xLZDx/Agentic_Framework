@@ -9,6 +9,7 @@ from pathlib import Path
 from . import core
 
 ROOT = core.FRAMEWORK_ROOT
+NL = chr(10)
 FM_RE = re.compile(r"\A---\r?\n(.*?)\r?\n---\r?\n(.*)\Z", re.S)
 
 
@@ -27,7 +28,10 @@ def parse_agent(path: Path) -> tuple[dict, str]:
         elif ":" in line:
             k, _, val = line.partition(":")
             k, val = k.strip(), val.strip()
-            if val:
+            if val.startswith("[") and val.endswith("]"):
+                meta[k] = [v.strip().strip("\"'") for v in val[1:-1].split(",") if v.strip()]
+                key, last_scalar = None, None
+            elif val:
                 meta[k] = val
                 key, last_scalar = None, k
             else:
@@ -72,6 +76,21 @@ def build(clean: bool = True) -> list[str]:
             dst = out / tgt["dest_skills"] / name
             shutil.copytree(ROOT / "core" / "skills" / name, dst)
             written.append(str(dst.relative_to(ROOT)))
+        af_cmd = (ROOT / "core" / "commands" / "af.md").read_text(encoding="utf-8")
+        desc = "Toggle and inspect the Agentic_Framework SDLC orchestration: on, off, status, next, pm-review, verify."
+        if target == "claude":
+            d = out / "skills" / "af"
+            d.mkdir(parents=True, exist_ok=True)
+            head = ["---", "name: af", f"description: {json.dumps(desc)}", "disable-model-invocation: true",
+                    "argument-hint: on|off|status|next|verify", "---", ""]
+            (d / "SKILL.md").write_text(NL.join(head) + NL + af_cmd, encoding="utf-8")
+            written.append("deploy/claude/skills/af")
+        else:
+            (out / "prompts").mkdir(parents=True, exist_ok=True)
+            head = ["---", f"description: {json.dumps(desc)}", "argument-hint: on|off|status|next|verify", "---", ""]
+            (out / "prompts" / "af.md").write_text(
+                NL.join(head) + NL + af_cmd + NL + "Arguments: $ARGUMENTS" + NL, encoding="utf-8")
+            written.append("deploy/codex/prompts/af.md")
         shutil.copy(ROOT / "core" / "orchestration" / "phase-map.json", out / "phase-map.json")
         written.append(str((out / "phase-map.json").relative_to(ROOT)))
         frag = out / ("CLAUDE.fragment.md" if target == "claude" else "AGENTS.fragment.md")
