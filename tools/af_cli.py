@@ -38,10 +38,24 @@ def cmd_status(args) -> int:
     return 0
 
 
+def _require_gate(args, mode: str) -> bool:
+    """Hard mode needs the authoritative git pre-push gate; refuse activation when it cannot be installed."""
+    rc = cmd_install_githook(args)
+    if rc != 0 and mode == "hard":
+        print("Framework NOT enabled in hard mode: the git pre-push gate could not be installed "
+              "(a foreign pre-push hook exists). Chain it manually by adding "
+              "`python <framework>/tools/af_cli.py --project \"$(git rev-parse --show-toplevel)\" gate-check || exit 1` "
+              "to that hook, or use --mode soft.")
+        return False
+    return True
+
+
 def cmd_start(args) -> int:
     p = _project(args)
     if core.read_state(p):
         print("A sprint already exists; refusing to overwrite.")
+        return 1
+    if not _require_gate(args, args.mode):
         return 1
     core.write_state(p, {"title": args.title, "phase": 1, "mode": args.mode, "paused": False, "history": []})
     print(f"Started '{args.title}' at phase 1 in {p}")
@@ -90,15 +104,17 @@ def cmd_on(args) -> int:
     p = _project(args)
     st = core.read_state(p)
     if st is None:
+        if not _require_gate(args, args.mode):  # authoritative push boundary for every tool, not just Claude
+            return 1
         core.write_state(p, {"title": args.title, "phase": 1, "mode": args.mode, "paused": False, "history": []})
         print(f"Framework ON: started '{args.title}' at phase 1 ({args.mode}) in {p}")
-        cmd_install_githook(args)  # authoritative push boundary for every tool, not just Claude
         return 0
+    mode = args.mode if args.mode_given else st["mode"]
+    if not _require_gate(args, mode):
+        return 1
     st["paused"] = False
-    if args.mode_given:
-        st["mode"] = args.mode
+    st["mode"] = mode
     core.write_state(p, st)
-    cmd_install_githook(args)
     print(f"Framework ON: resumed at phase {st['phase']} ({st['mode']}) in {p}")
     return 0
 
@@ -113,6 +129,12 @@ def cmd_off(args) -> int:
     core.write_state(p, st)
     print(f"Framework OFF: paused at phase {st['phase']}; no injection, no push gate. State kept.")
     return 0
+
+
+def cmd_mode(args) -> int:
+    if args.value == "hard" and not _require_gate(args, "hard"):
+        return 1
+    return _set(args, mode=args.value)
 
 
 def cmd_pm_review(args) -> int:
@@ -173,7 +195,7 @@ def main(argv=None) -> int:
     sub.add_parser("status").set_defaults(fn=cmd_status)
     s = sub.add_parser("start"); s.add_argument("title"); s.add_argument("--mode", default="hard", choices=["hard", "soft"]); s.set_defaults(fn=cmd_start)
     s = sub.add_parser("next"); s.add_argument("--force", action="store_true"); s.set_defaults(fn=cmd_next)
-    s = sub.add_parser("mode"); s.add_argument("value", choices=["hard", "soft"]); s.set_defaults(fn=lambda a: _set(a, mode=a.value))
+    s = sub.add_parser("mode"); s.add_argument("value", choices=["hard", "soft"]); s.set_defaults(fn=cmd_mode)
     sub.add_parser("pause").set_defaults(fn=lambda a: _set(a, paused=True))
     sub.add_parser("resume").set_defaults(fn=lambda a: _set(a, paused=False))
     s = sub.add_parser("on"); s.add_argument("--mode", default=None, choices=["hard", "soft"]); s.add_argument("--title", default="Sprint"); s.set_defaults(fn=cmd_on)

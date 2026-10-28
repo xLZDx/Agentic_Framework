@@ -14,6 +14,10 @@ Evidence (agent functional-test-reviewer, MEASURED): full suite 192 tests = 190 
 Real-push coverage: against a local bare remote, `git push`, `env git push` and `sh -c 'git push'` are blocked at phase 1 by the pre-push hook and allowed after `off`.
 Known limitation: push-command text detection is best-effort; the pre-push hook is the boundary. A push at phase 8+ with a valid approval through the pre-push hook is covered only by gate_decision tests.
 
+## Remediation round 2 (GPT-PM round 2: 2 MAJOR, previous 5 findings confirmed fixed)
+Reviewed range: 7728951...HEAD. Fixes: (1) hard mode `start`/`on`/`mode hard` install the git pre-push gate first and refuse activation when a foreign pre-push hook prevents it; soft mode only warns. (2) installer does not record a pre-existing byte-identical file as owned unless it was in the previous manifest, so uninstall never deletes it.
+Evidence (agent functional-test-reviewer, MEASURED): full suite `python -m unittest discover -s tests -v`: 205 tests, 204 OK, 0 failed, 0 errors, 1 self-skip, 582 s. 13 tests added in tests/test_hardening.py (8 pre-push contract, 4 identical-foreign-file installer, 1 stale-hook rewrite).
+
 ## NOT_RUN
 - Real `schtasks`/registry operations inside tests (argv-level checks only).
 - No test installs into the real ~/.claude or ~/.codex.

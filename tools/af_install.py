@@ -62,7 +62,8 @@ def put(src: Path, dst: Path, manifest: dict, prev: dict, log: list, dry: bool) 
         cur = sha(dst.read_bytes())
         if cur == sha(data):
             log.append(f"SAME     {dst}")
-            manifest[key] = cur
+            if key in prev:  # an identical pre-existing file we never created stays the user's
+                manifest[key] = cur
             return
         if key not in prev:
             log.append(f"SKIPPED  {dst} (exists, differs, not installed by us)")

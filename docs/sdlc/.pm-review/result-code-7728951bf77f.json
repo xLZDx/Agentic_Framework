@@ -1,0 +1,19 @@
+{
+  "ok": true,
+  "error": null,
+  "review_status": "RAN",
+  "round": 1,
+  "final": false,
+  "truncated": false,
+  "final_overridden": true,
+  "verdict": "MAJOR",
+  "verdict_contradiction": false,
+  "correlated": true,
+  "replyId": "9997f4df-6662-568a-ae1e-3e39344747ec",
+  "reviewRequestId": "e29c52c7-c3c1-4495-b902-6f255650cef1",
+  "reviewInputHash": "01503f15588c57c8675e2226304886167a55bf3629449dfae1bca5d620640c27",
+  "conversation": "6ae267b7-a2dc-83eb-8a3f-b929883d34a8",
+  "recovered": false,
+  "reply": "ChatGPT said:\n\nREQUEST_ID: e29c52c7-c3c1-4495-b902-6f255650cef1\n\nVERDICT: MAJOR\n\nMAJOR | Git pre-push enforcement is not guaranteed | tools/af_cli.py, cmd_on(), lines 92\u2013106: /af on activates hard-mode state before installing the Git pre-push hook and returns success even when installation is refused. tests/test_hardening.py, test_foreign_prepush_left_untouched, explicitly confirms this behavior | A repository already has a foreign pre-push hook. Framework activation reports success, but its authoritative Git push boundary is absent. Commands not recognized by the best-effort text parser can push without approval | In hard mode, verify successful installation of the authoritative gate before reporting activation success. If an existing hook prevents installation, fail activation explicitly or provide safe, consent-based hook chaining. Add a regression test proving that hard mode cannot report successful activation without an effective push gate.\n\nMAJOR | Installer claims ownership of pre-existing identical files | tools/af_install.py, put(), lines 54\u201361 of the updated file: when cur == sha(data), the installer unconditionally executes manifest[key] = cur, even if the path was absent from the previous manifest | A user already has an independently maintained agent or skill whose contents happen to match the framework's version. Installation records that file as framework-owned. A subsequent --uninstall deletes the user's pre-existing file despite the installer never having created it | When an existing file is identical, record ownership only if its path was already owned in the previous manifest. Otherwise leave it untracked. Add a test that seeds an identical foreign file, installs the framework, uninstalls it, and verifies that the original file survives.\n\nVerification of previous findings\n\nPrevious finding\n\n\t\n\nResult\n\n\n\n\nPush detection bypass through wrappers\n\n\t\n\nFixed \u2014 additional parsing and real pre-push tests\n\n\n\n\nUser-edited files overwritten or deleted\n\n\t\n\nFixed \u2014 SHA-256 comparison protects modifications\n\n\n\n\nStale framework hook paths\n\n\t\n\nFixed \u2014 existing framework hooks are reconciled\n\n\n\n\ngh pr IndexError\n\n\t\n\nFixed \u2014 token-length validation\n\n\n\n\nTracked Python bytecode\n\n\t\n\nFixed \u2014 removed from Git index\n\nThe two new MAJOR findings are direct regressions or incomplete protections within the remediation scope.\n\nFinal decision: HEAD 7728951bf77f062e1a1114a4eebfd43d910ad831 is not approved for push.\n\nThe remaining changes should be narrowly scoped to these two findings and their regression tests. No additional unrelated improvements are required for this review.\n\nVerification is based on the supplied diff and reported test evidence; the exact GitHub HEAD was not independently executed.",
+  "receipt_written": true
+}

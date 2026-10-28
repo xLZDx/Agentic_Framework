@@ -240,6 +240,56 @@ class HashManifestInstaller(InstallBase):
         self.assertEqual(mine.read_bytes(), b"foreign\n")
 
 
+class IdenticalForeignFile(InstallBase):
+    def manifest(self, home):
+        return json.loads((home / "af-install-manifest.json").read_text(encoding="utf-8"))
+
+    def rendered(self, home_name="claude", rel="agents/architect.md"):
+        src = ROOT / "deploy" / home_name / rel
+        return src.read_text(encoding="utf-8").replace("{fw}", FW_POSIX).encode("utf-8")
+
+    def test_identical_preexisting_file_not_owned_survives_uninstall(self):
+        f = self.ch / "agents" / "architect.md"
+        f.parent.mkdir(parents=True)
+        f.write_bytes(self.rendered())
+        r = self.go()
+        self.assertIn("SAME", r.stdout)
+        self.assertNotIn(str(f), self.manifest(self.ch))
+        self.assertIn(str(self.ch / "agents" / "planner.md"), self.manifest(self.ch))
+        self.go("--uninstall")
+        self.assertTrue(f.is_file())
+        self.assertEqual(f.read_bytes(), self.rendered())
+        self.assertFalse((self.ch / "agents" / "planner.md").exists())
+
+    def test_identical_file_stays_unowned_across_reinstalls(self):
+        f = self.ch / "agents" / "architect.md"
+        f.parent.mkdir(parents=True)
+        f.write_bytes(self.rendered())
+        self.go()
+        self.go()
+        self.assertNotIn(str(f), self.manifest(self.ch))
+        self.go("--uninstall")
+        self.assertTrue(f.is_file())
+
+    def test_identical_codex_foreign_file_survives_uninstall(self):
+        f = self.cx / "agents" / "architect.toml"
+        f.parent.mkdir(parents=True)
+        f.write_bytes(self.rendered("codex", "agents/architect.toml"))
+        self.go()
+        self.assertNotIn(str(f), self.manifest(self.cx))
+        self.go("--uninstall")
+        self.assertTrue(f.is_file())
+
+    def test_identical_file_that_was_in_previous_manifest_is_still_tracked_and_removed(self):
+        self.go()
+        f = self.ch / "agents" / "architect.md"
+        self.assertIn(str(f), self.manifest(self.ch))
+        self.go()  # SAME on a file we own
+        self.assertIn(str(f), self.manifest(self.ch))
+        self.go("--uninstall")
+        self.assertFalse(f.exists())
+
+
 class StaleHooks(InstallBase):
     def stale(self, event_cmds=None):
         old = "python D:/old/checkout/tools/af_cli.py hook"
@@ -355,15 +405,102 @@ class OnInstallsPrePush(unittest.TestCase):
         r = self.push("git push origin HEAD:refs/heads/main")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
 
-    def test_foreign_prepush_left_untouched(self):
+    FOREIGN = b"#!/bin/sh\necho mine\n"
+
+    def seed_foreign(self):
         self.hook_file.parent.mkdir(parents=True, exist_ok=True)
-        body = "#!/bin/sh\necho mine\n"
-        self.hook_file.write_bytes(body.encode())
+        self.hook_file.write_bytes(self.FOREIGN)
+
+    def state_file(self):
+        return H.sdlc(self.repo) / "state.json"
+
+    def test_hard_on_with_foreign_prepush_refused_no_state(self):
+        self.seed_foreign()
         r = H.run_cli(self.repo, "on")
-        self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertEqual(self.hook_file.read_bytes(), body.encode())
-        self.assertIn("REFUSED", r.stdout)
-        self.assertEqual(H.sdlc(self.repo).joinpath("state.json").is_file(), True)
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("NOT enabled", r.stdout)
+        self.assertIn("--mode soft", r.stdout)
+        self.assertFalse(self.state_file().exists())
+        self.assertEqual(self.hook_file.read_bytes(), self.FOREIGN)
+
+    def test_hard_start_with_foreign_prepush_refused_no_state(self):
+        self.seed_foreign()
+        r = H.run_cli(self.repo, "start", "S")
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertFalse(self.state_file().exists())
+        self.assertEqual(self.hook_file.read_bytes(), self.FOREIGN)
+
+    def test_mode_hard_with_foreign_prepush_refused_state_unchanged(self):
+        H.set_state(self.repo, phase=3, mode="soft")
+        self.seed_foreign()
+        before = self.state_file().read_bytes()
+        r = H.run_cli(self.repo, "mode", "hard")
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertEqual(self.state_file().read_bytes(), before)
+        self.assertEqual(H.core.read_state(self.repo)["mode"], "soft")
+        self.assertEqual(self.hook_file.read_bytes(), self.FOREIGN)
+
+    def test_mode_soft_with_foreign_prepush_allowed(self):
+        H.set_state(self.repo, phase=3, mode="hard")
+        self.seed_foreign()
+        r = H.run_cli(self.repo, "mode", "soft")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(H.core.read_state(self.repo)["mode"], "soft")
+        self.assertEqual(self.hook_file.read_bytes(), self.FOREIGN)
+
+    def test_soft_on_and_start_with_foreign_prepush_succeed_with_warning(self):
+        self.seed_foreign()
+        r = H.run_cli(self.repo, "on", "--mode", "soft")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("REFUSED", r.stdout)  # warning that the gate could not be installed
+        st = H.core.read_state(self.repo)
+        self.assertEqual((st["mode"], st["phase"], st["paused"]), ("soft", 1, False))
+        self.assertEqual(self.hook_file.read_bytes(), self.FOREIGN)
+        # start in soft mode in a fresh repo with a foreign hook
+        repo2 = H.make_repo(self)
+        h2 = repo2 / ".git" / "hooks" / "pre-push"
+        h2.parent.mkdir(parents=True, exist_ok=True)
+        h2.write_bytes(self.FOREIGN)
+        r = H.run_cli(repo2, "start", "S", "--mode", "soft")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(H.core.read_state(repo2)["mode"], "soft")
+        self.assertEqual(h2.read_bytes(), self.FOREIGN)
+
+    def test_resume_paused_hard_sprint_with_foreign_prepush_refused_stays_paused(self):
+        H.set_state(self.repo, phase=4, mode="hard", paused=True)
+        self.seed_foreign()
+        before = self.state_file().read_bytes()
+        r = H.run_cli(self.repo, "on")
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        st = H.core.read_state(self.repo)
+        self.assertTrue(st["paused"])
+        self.assertEqual(st["phase"], 4)
+        self.assertEqual(self.state_file().read_bytes(), before)
+        self.assertEqual(self.hook_file.read_bytes(), self.FOREIGN)
+
+    def test_resume_paused_hard_sprint_with_our_own_hook_succeeds(self):
+        H.run_cli(self.repo, "on")
+        H.run_cli(self.repo, "off")
+        self.assertTrue(H.core.read_state(self.repo)["paused"])
+        r = H.run_cli(self.repo, "on")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertFalse(H.core.read_state(self.repo)["paused"])
+        self.assertIn("# agentic-framework pre-push", self.hook_file.read_text(encoding="utf-8"))
+
+    def test_resume_soft_paused_with_foreign_prepush_succeeds(self):
+        H.set_state(self.repo, phase=4, mode="soft", paused=True)
+        self.seed_foreign()
+        r = H.run_cli(self.repo, "on")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertFalse(H.core.read_state(self.repo)["paused"])
+
+    def test_hard_on_with_our_stale_hook_rewrites_it(self):
+        self.hook_file.parent.mkdir(parents=True, exist_ok=True)
+        self.hook_file.write_text("#!/bin/sh\n# agentic-framework pre-push\npython /old/af_cli.py gate-check\n",
+                                  encoding="utf-8")
+        r = H.run_cli(self.repo, "on")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertNotIn("/old/af_cli.py", self.hook_file.read_text(encoding="utf-8"))
 
     def test_on_twice_keeps_single_our_hook(self):
         H.run_cli(self.repo, "on")
