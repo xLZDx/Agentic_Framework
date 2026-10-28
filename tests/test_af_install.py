@@ -140,14 +140,15 @@ class FirstInstall(InstallBase):
         self.assertFalse((self.ch / "agents").exists())
         self.assertFalse((self.ch / "settings.json").exists())
 
-    def test_rerun_updates_files_we_own_but_changed(self):
+    def test_rerun_keeps_locally_edited_owned_file(self):
         self.go()
         f = self.ch / "agents" / "architect.md"
         good = f.read_bytes()
         f.write_bytes(b"locally edited\n")
         r = self.go()
-        # owned (in manifest) -> refreshed, not SKIPPED
-        self.assertEqual(f.read_bytes(), good)
+        # hash-manifest semantics: an owned file edited by the user is kept (MODIFIED), never overwritten
+        self.assertEqual(f.read_bytes(), b"locally edited" + bytes([10]))
+        self.assertIn("MODIFIED", r.stdout)
         self.assertNotIn("SKIPPED", r.stdout)
 
 

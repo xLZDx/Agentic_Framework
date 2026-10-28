@@ -15,25 +15,85 @@ from pathlib import Path
 
 from . import core, pm_review
 
-SEGMENT_RE = re.compile(r"&&|\|\||[;|&\n]")
+SEGMENT_RE = re.compile(r"&&|\|\||[;|&\n()`]")
 GIT_OPTS_WITH_VALUE = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path"}
+WRAPPERS = {"env", "command", "exec", "nice", "nohup", "time", "sudo", "builtin", "stdbuf", "timeout",
+            "then", "do", "else", "!", "{"}
+POSIX_SHELLS = {"sh", "bash", "zsh", "dash", "ksh", "fish"}
+MAX_DEPTH = 4
 
 
-def is_push_command(command: str) -> bool:
-    """True when any shell segment runs `git push`, `gh pr create` or `gh pr merge`."""
-    for seg in SEGMENT_RE.split(command):
-        seg = seg.replace(chr(92), "/")  # Windows paths: shlex would otherwise eat the backslashes
-        try:
-            toks = shlex.split(seg, posix=True)
-        except ValueError:
-            toks = seg.split()
-        while toks and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", toks[0]):
-            toks = toks[1:]
+def _exe(tok: str) -> str:
+    return re.split(r"[\\/]", tok)[-1].lower().removesuffix(".exe")
+
+
+def _segments(command: str) -> list[list[str]]:
+    """Tokenise honouring quotes, then split into command segments on shell operators."""
+    text = command.replace(chr(92), "/").replace("`", " ; ").replace(chr(10), " ; ")
+    try:
+        lex = shlex.shlex(text, posix=True, punctuation_chars=True)
+        lex.whitespace_split = True
+        toks = list(lex)
+    except ValueError:
+        toks = []
+        for seg in SEGMENT_RE.split(text):
+            toks += seg.split() + [";"]
+    segs: list[list[str]] = [[]]
+    for tok in toks:
+        if tok and set(tok) <= set("();<>|&"):
+            segs.append([])
+        else:
+            segs[-1].append(tok)
+    return [s for s in segs if s]
+
+
+def _nested_payload(exe: str, toks: list[str]) -> str | None:
+    """Command string handed to a nested shell (`sh -c '...'`, `cmd /c ...`, `pwsh -Command ...`)."""
+    if exe in POSIX_SHELLS:
+        for i, t in enumerate(toks[1:], 1):
+            if re.fullmatch(r"-[A-Za-z]*c[A-Za-z]*", t) and i + 1 < len(toks):
+                return toks[i + 1]
+    elif exe == "cmd":
+        for i, t in enumerate(toks[1:], 1):
+            if t.lower() in ("/c", "/k"):
+                return " ".join(toks[i + 1:])
+    elif exe in ("pwsh", "powershell"):
+        for i, t in enumerate(toks[1:], 1):
+            if t.lower() in ("-c", "-command"):
+                return " ".join(toks[i + 1:])
+    return None
+
+
+def is_push_command(command: str, _depth: int = 0) -> bool:
+    """True when the command runs `git push`, `gh pr create` or `gh pr merge`.
+
+    Handles chained segments, leading env assignments, wrappers (env, command, sudo, ...) and nested
+    shells (sh -c, cmd /c, pwsh -Command). This is a best-effort text check; the git pre-push hook
+    (af_cli.py install-githook, installed by `on`) is the authoritative boundary.
+    """
+    if _depth > MAX_DEPTH:
+        return False
+    for toks in _segments(command):
+        while toks:
+            if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", toks[0]):
+                toks = toks[1:]
+            elif _exe(toks[0]) in WRAPPERS:
+                toks = toks[1:]
+                while toks and (toks[0].startswith("-") or re.fullmatch(r"\d+[smhd]?", toks[0])
+                                or re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", toks[0])):
+                    toks = toks[1:]
+            else:
+                break
         if not toks:
             continue
-        exe = re.split(r"[\\/]", toks[0])[-1].lower().removesuffix(".exe")
-        if exe == "gh" and toks[1:3] and toks[1] == "pr" and toks[2] in ("create", "merge"):
+        exe = _exe(toks[0])
+        payload = _nested_payload(exe, toks)
+        if payload is not None and is_push_command(payload, _depth + 1):
             return True
+        if exe == "gh":
+            if len(toks) >= 3 and toks[1] == "pr" and toks[2] in ("create", "merge"):
+                return True
+            continue
         if exe != "git":
             continue
         i = 1

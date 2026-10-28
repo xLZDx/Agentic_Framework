@@ -92,11 +92,13 @@ def cmd_on(args) -> int:
     if st is None:
         core.write_state(p, {"title": args.title, "phase": 1, "mode": args.mode, "paused": False, "history": []})
         print(f"Framework ON: started '{args.title}' at phase 1 ({args.mode}) in {p}")
+        cmd_install_githook(args)  # authoritative push boundary for every tool, not just Claude
         return 0
     st["paused"] = False
     if args.mode_given:
         st["mode"] = args.mode
     core.write_state(p, st)
+    cmd_install_githook(args)
     print(f"Framework ON: resumed at phase {st['phase']} ({st['mode']}) in {p}")
     return 0
 
