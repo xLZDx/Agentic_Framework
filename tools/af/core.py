@@ -70,12 +70,28 @@ def write_state(project: Path, state: dict) -> None:
     (d / "STATE.md").write_text(render_state_md(project, state), encoding="utf-8")
 
 
-def artifact_present(project: Path, pattern: str) -> bool:
-    return bool(glob.glob(str(state_dir(project) / pattern)))
+def artifact_present(project: Path, pattern: str, since: float | None = None) -> bool:
+    """An artifact counts only if it exists and (when `since` is given) was written after the sprint started."""
+    for f in glob.glob(str(state_dir(project) / pattern)):
+        if since is None or os.path.getmtime(f) >= since:
+            return True
+    return False
 
 
 def missing_artifacts(project: Path, n: int) -> list[str]:
-    return [a for a in phase_def(n)["artifacts"] if not artifact_present(project, a)]
+    st = read_state(project) or {}
+    since = st.get("started_epoch")
+    return [a for a in phase_def(n)["artifacts"] if not artifact_present(project, a, since)]
+
+
+def new_sprint_state(project: Path, title: str, mode: str) -> dict:
+    """Initial state; remembers the start time and HEAD so stale artifacts and narrowed review bases are rejected."""
+    try:
+        start_head = head(project)
+    except Exception:
+        start_head = None
+    return {"title": title, "phase": 1, "mode": mode, "paused": False, "history": [],
+            "started_epoch": datetime.now(timezone.utc).timestamp(), "start_head": start_head}
 
 
 def render_state_md(project: Path, state: dict) -> str:

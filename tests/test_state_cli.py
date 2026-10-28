@@ -134,13 +134,14 @@ class NextGate(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stdout)
         self.assertEqual(state(self.repo)["phase"], 9)
 
-    def test_phase_8_force_bypasses_approval_and_is_audited(self):
+    def test_phase_8_force_does_not_bypass_approval(self):
         H.set_state(self.repo, phase=8)
+        H.write_artifact(self.repo, "gate-approval.md")
         r = H.run_cli(self.repo, "next", "--force")
-        self.assertEqual(r.returncode, 0)
-        st = state(self.repo)
-        self.assertEqual(st["phase"], 9)
-        self.assertTrue(st["history"][-1]["forced"])
+        self.assertEqual(r.returncode, 1, r.stdout)
+        self.assertIn("BLOCKED", r.stdout)
+        self.assertIn("--force does not apply", r.stdout)
+        self.assertEqual(state(self.repo)["phase"], 8)
 
     def test_last_phase_does_not_advance(self):
         H.set_state(self.repo, phase=10)

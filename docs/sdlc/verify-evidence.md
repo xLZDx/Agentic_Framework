@@ -18,6 +18,10 @@ Known limitation: push-command text detection is best-effort; the pre-push hook 
 Reviewed range: 7728951...HEAD. Fixes: (1) hard mode `start`/`on`/`mode hard` install the git pre-push gate first and refuse activation when a foreign pre-push hook prevents it; soft mode only warns. (2) installer does not record a pre-existing byte-identical file as owned unless it was in the previous manifest, so uninstall never deletes it.
 Evidence (agent functional-test-reviewer, MEASURED): full suite `python -m unittest discover -s tests -v`: 205 tests, 204 OK, 0 failed, 0 errors, 1 self-skip, 582 s. 13 tests added in tests/test_hardening.py (8 pre-push contract, 4 identical-foreign-file installer, 1 stale-hook rewrite).
 
+## Remediation round 3 (GPT-PM review of the root commit 20c0098: 4 MAJOR + 2 MINOR; round 3 on 4dcd4ba was APPROVE)
+Reviewed range: 4dcd4ba...HEAD. Fixes: pm-review preflight (evidence file must contain "## Test evidence" and "## NOT_RUN"; base must be a commit, an ancestor of HEAD and of the sprint start_head, range non-empty; approval records base_sha, diff_sha256, evidence_sha256); `next --force` never bypasses a required PM approval; artifacts count only if written after the sprint started (started_epoch/start_head recorded); per-agent effort preserved when allowed (claude low/medium/high, codex low/medium); tools/vst references removed from core.
+Evidence (agent functional-test-reviewer, MEASURED): full suite `python -m unittest discover -s tests -v`: 243 tests, 242 OK, 0 failed, 0 errors, 1 self-skip, 572 s. 38 tests added (tests/test_round4.py); 24 existing tests were adapted to the new contracts (evidence file in temp repos, --force semantics, derived effort).
+
 ## NOT_RUN
 - Real `schtasks`/registry operations inside tests (argv-level checks only).
 - No test installs into the real ~/.claude or ~/.codex.

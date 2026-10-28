@@ -13,7 +13,7 @@ skills:
 - a11y-contract
 model: sonnet
 maxTurns: 16
-effort: medium
+effort: high
 ---
 
 # UI Designer

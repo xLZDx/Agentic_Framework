@@ -68,7 +68,7 @@ class ImportedAgents(unittest.TestCase):
                 self.assertEqual(meta["name"], name)
                 self.assertTrue(meta["description"].strip())
                 self.assertEqual(meta["model"], "sonnet")
-                self.assertEqual(meta["effort"], "medium")
+                self.assertEqual(meta["effort"], deploy.agent_effort(deploy.parse_agent(ROOT / "core" / "agents" / f"{name}.md")[0], CFG["targets"]["claude"], ("low", "medium", "high")))
                 self.assertTrue(meta["maxTurns"].isdigit())
                 src = source_tools(name)
                 if src:

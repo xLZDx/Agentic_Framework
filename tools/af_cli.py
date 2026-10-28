@@ -57,7 +57,7 @@ def cmd_start(args) -> int:
         return 1
     if not _require_gate(args, args.mode):
         return 1
-    core.write_state(p, {"title": args.title, "phase": 1, "mode": args.mode, "paused": False, "history": []})
+    core.write_state(p, core.new_sprint_state(p, args.title, args.mode))
     print(f"Started '{args.title}' at phase 1 in {p}")
     return 0
 
@@ -76,8 +76,8 @@ def cmd_next(args) -> int:
     pm = core.phase_def(n).get("pm_review")
     if pm and pm["required"]:
         ok, why = pm_review.verify(p, pm["kind"])
-        if not ok and not args.force:
-            print(f"BLOCKED: PM-GPT approval required at phase {n}: {why}")
+        if not ok:  # --force never bypasses a required PM-GPT approval
+            print(f"BLOCKED: PM-GPT approval required at phase {n}: {why} (--force does not apply)")
             return 1
     if n >= 10:
         print("Already at the last phase.")
@@ -106,7 +106,7 @@ def cmd_on(args) -> int:
     if st is None:
         if not _require_gate(args, args.mode):  # authoritative push boundary for every tool, not just Claude
             return 1
-        core.write_state(p, {"title": args.title, "phase": 1, "mode": args.mode, "paused": False, "history": []})
+        core.write_state(p, core.new_sprint_state(p, args.title, args.mode))
         print(f"Framework ON: started '{args.title}' at phase 1 ({args.mode}) in {p}")
         return 0
     mode = args.mode if args.mode_given else st["mode"]

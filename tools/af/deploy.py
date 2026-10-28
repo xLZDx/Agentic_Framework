@@ -40,20 +40,26 @@ def parse_agent(path: Path) -> tuple[dict, str]:
     return meta, m.group(2).lstrip("\n")
 
 
+def agent_effort(meta: dict, tgt: dict, allowed: tuple) -> str:
+    """Per-agent effort override when the policy allows it; otherwise the target default."""
+    e = str(meta.get("effort", "")).strip().lower()
+    return e if e in allowed else tgt["effort"]
+
+
 def render_claude_agent(meta: dict, body: str, tgt: dict) -> str:
     fm = ["---", f"name: {meta['name']}", f"description: {json.dumps(meta['description'])}"]
     for k in ("tools", "skills"):
         if meta.get(k):
             fm.append(f"{k}:")
             fm += [f"- {v}" for v in meta[k]]
-    fm += [f"model: {tgt['model']}", f"maxTurns: {meta.get('maxTurns', '16')}", f"effort: {tgt['effort']}", "---", ""]
+    fm += [f"model: {tgt['model']}", f"maxTurns: {meta.get('maxTurns', '16')}", f"effort: {agent_effort(meta, tgt, ('low', 'medium', 'high'))}", "---", ""]
     return "\n".join(fm) + "\n" + body
 
 
 def render_codex_agent(meta: dict, body: str, tgt: dict) -> str:
     q = json.dumps
     return (f"name = {q(meta['name'])}\nmodel = {q(tgt['model'])}\n"
-            f"model_reasoning_effort = {q(tgt['effort'])}\n"
+            f"model_reasoning_effort = {q(agent_effort(meta, tgt, ('low', 'medium')))}\n"
             f"description = {q(meta['description'])}\n"
             f"developer_instructions = {q(body.strip())}\n")
 

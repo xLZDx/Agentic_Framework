@@ -9,7 +9,7 @@ description: Run lightweight scrum ceremonies (planning, refinement, review, ret
 A sprint opens, scope changes, or a sprint closes.
 
 ## Method
-- **Planning:** confirm sprint goal, pull ready stories (DoR met), record capacity assumptions and risks through the orchestrator. Until the S1 state store (`tools/vst/store.py`) is in use for a project, `docs/sdlc/STATE.md` is the phase authority; once it is in use, the store is the authority and `STATE.md` is its generated read-only view (baseline decision BD-1), so record items through the orchestrator/store and never hand-edit the view.
+- **Planning:** confirm sprint goal, pull ready stories (DoR met), record capacity assumptions and risks through the orchestrator. The phase authority is `docs/sdlc/state.json` (`STATE.md` is its generated read-only view), so record items through the orchestrator and never hand-edit the view.
 - **Refinement:** product-owner and business-analyst clarify upcoming stories; unresolved items go to the backlog, not into the sprint.
 - **Review:** compare outcome to goal using acceptance evidence; list accepted, rejected, carried stories.
 - **Retrospective:** from measured data (`sdlc-metrics`) list what worked, what failed, and at most three concrete actions with owners; apply process fixes to skills/agents, not to chat memory.

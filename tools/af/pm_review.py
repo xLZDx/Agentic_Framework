@@ -63,6 +63,36 @@ def _accept(result: dict) -> tuple[bool, str]:
     return True, "ok"
 
 
+EVIDENCE_HEADINGS = ("## Test evidence", "## NOT_RUN")
+
+
+def _preflight(project: Path, kind: str, base: str, head_sha: str) -> str | None:
+    """Reject incomplete evidence and review ranges that do not cover the sprint."""
+    if kind == "code":
+        ev = core.state_dir(project) / "verify-evidence.md"
+        text = ev.read_text(encoding="utf-8", errors="replace") if ev.is_file() else ""
+        missing = [h for h in EVIDENCE_HEADINGS if h not in text]
+        if missing:
+            return f"verify-evidence.md is missing or lacks required sections {missing}; produce the phase-7 evidence first."
+    try:
+        base_sha = core.git(project, "rev-parse", "--verify", f"{base}^{{commit}}").strip()
+    except RuntimeError as exc:
+        return f"base {base!r} does not resolve to a commit: {exc}"
+    anc = subprocess.run(["git", "-C", str(project), "merge-base", "--is-ancestor", base_sha, head_sha])
+    if anc.returncode != 0:
+        return f"base {base_sha[:12]} is not an ancestor of HEAD"
+    st = core.read_state(project) or {}
+    start = st.get("start_head")
+    if kind == "code" and start:
+        cov = subprocess.run(["git", "-C", str(project), "merge-base", "--is-ancestor", base_sha, start])
+        if cov.returncode != 0:
+            return (f"base {base_sha[:12]} starts after the sprint baseline {start[:12]}; "
+                    "the review range would omit sprint changes")
+    if subprocess.run(["git", "-C", str(project), "diff", "--quiet", f"{base_sha}...{head_sha}"]).returncode == 0:
+        return "the review range is empty"
+    return None
+
+
 def request(project: Path, kind: str, base: str, node: str = "node", project_id: str | None = None) -> int:
     if kind not in KINDS:
         raise SystemExit(f"kind must be one of {KINDS}")
@@ -76,6 +106,10 @@ def request(project: Path, kind: str, base: str, node: str = "node", project_id:
         return 2
     head_sha = core.head(project)
     sd = core.state_dir(project)
+    problem = _preflight(project, kind, base, head_sha)
+    if problem:
+        print(f"REFUSED: {problem}")
+        return 2
     pm_dir = sd / ".pm-review"
     pm_dir.mkdir(parents=True, exist_ok=True)
     packet = pm_dir / f"packet-{kind}-{head_sha[:12]}.md"
@@ -106,6 +140,10 @@ def request(project: Path, kind: str, base: str, node: str = "node", project_id:
         "request_id": result["reviewRequestId"],
         "reply_id": result["replyId"],
         "input_hash": result.get("reviewInputHash"),
+        "base_sha": core.git(project, "rev-parse", f"{base}^{{commit}}").strip(),
+        "diff_sha256": hashlib.sha256(core.git(project, "diff", f"{base}...{head_sha}").encode("utf-8", "replace")).hexdigest(),
+        "evidence_sha256": hashlib.sha256((core.state_dir(project) / "verify-evidence.md").read_bytes()).hexdigest()
+        if (core.state_dir(project) / "verify-evidence.md").is_file() else None,
         "reply_sha256": hashlib.sha256((result.get("reply") or "").encode("utf-8")).hexdigest(),
         "recorded": core.now_iso(),
         "reviewer": "GPT-PM via PM Bridge review.js",

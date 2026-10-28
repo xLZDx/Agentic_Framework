@@ -97,18 +97,23 @@ class Verify(unittest.TestCase):
         self.assertTrue(r.stdout.startswith("OK"))
 
 
+GOOD_EVIDENCE = chr(10).join(["# Evidence", "", "## Test evidence", "all green", "", "## NOT_RUN", "nothing", ""])
+
+
 @unittest.skipUnless(NODE, "NOT_RUN: node is not available; fake review.js cannot be executed")
 class Request(unittest.TestCase):
     def setUp(self):
         self.repo = H.make_repo(self)
         H.commit_file(self.repo, "a.txt")
         H.set_state(self.repo, phase=8)
+        H.write_artifact(self.repo, "verify-evidence.md", GOOD_EVIDENCE)
         self.base = H.first_commit(self.repo)
         self.tools = H.tmpdir(self)
         (self.tools / "review.js").write_text(H.FAKE_REVIEW_JS, encoding="utf-8")
 
     def run_request(self, result=None, kind="code", repo=None, **opts):
         repo = repo or self.repo
+        base = opts.pop("base", None) or (H.first_commit(repo) if repo != self.repo else self.base)
         cfg = {"result": result if result is not None else APPROVE,
                "argv_out": str(self.tools / "argv.json"), "packet_out": str(self.tools / "packet.md")}
         cfg.update(opts)
@@ -117,7 +122,7 @@ class Request(unittest.TestCase):
         with mock.patch.dict(os.environ, env):
             buf = io.StringIO()
             with contextlib.redirect_stdout(buf):
-                rc = pm_review.request(repo, kind, self.base)
+                rc = pm_review.request(repo, kind, base)
         return rc, buf.getvalue()
 
     def approval_files(self, repo=None, kind="code"):
@@ -146,7 +151,7 @@ class Request(unittest.TestCase):
         self.assertFalse(pm_review.verify(self.repo)[0])
 
     def test_request_passes_exact_range_and_packet_to_review_js(self):
-        H.write_artifact(self.repo, "verify-evidence.md", "EVIDENCE-MARKER\n")
+        H.write_artifact(self.repo, "verify-evidence.md", GOOD_EVIDENCE + "EVIDENCE-MARKER")
         rc, out = self.run_request()
         self.assertEqual(rc, 0, out)
         argv = json.loads((self.tools / "argv.json").read_text(encoding="utf-8"))
@@ -157,10 +162,12 @@ class Request(unittest.TestCase):
         self.assertIn(f"Exact HEAD under review: {core.head(self.repo)}", packet)
         self.assertIn("EVIDENCE-MARKER", packet)
 
-    def test_missing_verify_evidence_flagged_in_packet(self):
-        self.run_request()
-        self.assertIn("MISSING (treat all verification as NOT_RUN)",
-                      (self.tools / "packet.md").read_text(encoding="utf-8"))
+    def test_missing_verify_evidence_is_refused_for_code(self):
+        (H.sdlc(self.repo) / "verify-evidence.md").unlink()
+        rc, out = self.run_request()
+        self.assertEqual(rc, 2)
+        self.assertIn("REFUSED", out)
+        self.assertFalse((self.tools / "argv.json").exists())  # review.js never invoked
 
     def test_project_id_forwarded(self):
         cfg = {"result": APPROVE, "argv_out": str(self.tools / "argv.json"), "packet_out": str(self.tools / "packet.md")}
@@ -202,6 +209,7 @@ class Request(unittest.TestCase):
                 repo = H.make_repo(self)
                 H.commit_file(repo, "a.txt")
                 H.set_state(repo, phase=8)
+                H.write_artifact(repo, "verify-evidence.md", GOOD_EVIDENCE)
                 result = copy.deepcopy(APPROVE)
                 result.update(patch)
                 rc, out = self.run_request(result, repo=repo)

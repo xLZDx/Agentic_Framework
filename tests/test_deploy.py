@@ -76,7 +76,9 @@ class Build(unittest.TestCase):
                 meta, body = deploy.parse_agent(f)
                 self.assertEqual(meta["name"], name)
                 self.assertEqual(meta["model"], "sonnet")
-                self.assertEqual(meta["effort"], "medium")
+                self.assertEqual(meta["effort"], deploy.agent_effort(
+                    deploy.parse_agent(ROOT / "core" / "agents" / f"{name}.md")[0], CFG["targets"]["claude"],
+                    ("low", "medium", "high")))
                 self.assertTrue(meta["maxTurns"].isdigit())
                 desc = json.loads(meta["description"])  # must be a valid single-line JSON string
                 self.assertGreater(len(desc.strip()), 20)

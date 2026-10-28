@@ -1,0 +1,19 @@
+{
+  "ok": true,
+  "error": null,
+  "review_status": "RAN",
+  "round": 1,
+  "final": true,
+  "truncated": false,
+  "final_overridden": false,
+  "verdict": "APPROVE",
+  "verdict_contradiction": false,
+  "correlated": true,
+  "replyId": "74c7b03b-f61a-4b31-9c5c-109014cb8114",
+  "reviewRequestId": "d1c1400f-078c-46b0-a184-d3a74c26b4cc",
+  "reviewInputHash": "022b764382ae5d01884c30101eb105c6f0c375de3002f3b9a28056f90e233347",
+  "conversation": "6ae267b7-a2dc-83eb-8a3f-b929883d34a8",
+  "recovered": false,
+  "reply": "ChatGPT said:\n\nREQUEST_ID: d1c1400f-078c-46b0-a184-d3a74c26b4cc\n\nVERDICT: APPROVE\n\nScope: 7728951...4dcd4ba9453c483b3c364900621ee7ffa5c1eef9\n\nBLOCKER: 0 | MAJOR: 0 | MINOR: 0\n\nThe supplied diff addresses both MAJOR findings from the previous review. No new blocking defect was established within the remediation scope.\n\nRESOLVED | Hard-mode activation without an effective pre-push gate | tools/af_cli.py, _require_gate(), cmd_start(), cmd_on(), cmd_mode() | Gate installation now precedes hard-mode state activation or resumption. A nonzero installation result prevents activation; an existing sprint's state remains unchanged. The new tests cover start, on, mode hard, paused-sprint resumption, foreign hooks and stale framework hooks. | No further change required for this finding.\n\nRESOLVED | Incorrect ownership of pre-existing identical files | tools/af_install.py, put(), identical-content branch | manifest[key] = cur now executes only when key in prev. A byte-identical file that predates installation remains unowned, including across repeated installations. Regression tests verify preservation after uninstall for Claude and Codex, while previously owned identical files remain removable. | No further change required for this finding.\n\nVerification evidence: The supplied report records 205 tests, 204 passed, 0 failures, 0 errors and 1 self-skip. The 13 additional tests exercise the two corrected contracts and the stale-hook regression. These are reported test results, not tests independently executed in this review.\n\nResidual limitations: Real Windows scheduled-task/registry operations, installation into actual user homes, the real PM Bridge reviewer, and a phase-8 approved push through the pre-push hook remain untested in the supplied evidence. These limitations do not establish a regression in either corrected finding.\n\nFinal decision: APPROVE the scoped remediation at exact HEAD 4dcd4ba9453c483b3c364900621ee7ffa5c1eef9 for push under the current Gate policy. This is not a release-readiness certification or an independent verification of the remote Git HEAD.",
+  "receipt_written": true
+}
