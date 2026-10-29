@@ -1,0 +1,19 @@
+{
+  "ok": true,
+  "error": null,
+  "review_status": "RAN",
+  "round": 1,
+  "final": true,
+  "truncated": false,
+  "final_overridden": false,
+  "verdict": "MINOR",
+  "verdict_contradiction": false,
+  "correlated": true,
+  "replyId": "908495b2-6e4d-4130-9f1d-c9758b351440",
+  "reviewRequestId": "fe1a5f4c-3e75-4492-89d3-55ca8a27657e",
+  "reviewInputHash": "42746c280175a5622dd41878550744b8c78c3abcd3c6f757b58724f57388d2c6",
+  "conversation": "6ae267b7-a2dc-83eb-8a3f-b929883d34a8",
+  "recovered": false,
+  "reply": "ChatGPT said:\n\nREQUEST_ID: fe1a5f4c-3e75-4492-89d3-55ca8a27657e\n\nVERDICT: MINOR\n\nProject: Agentic_Framework\nReviewed range: 4dcd4ba...28b6830590f383a0ec6d5553df156bb60da1ec4c\n\nBLOCKER: 0 | MAJOR: 0 | MINOR: 1\n\nThe previously outstanding MAJOR finding concerning zero-pass verification evidence is resolved. The accompanying reviewer-waiver contract and protection of pre-existing STATE.md files are also implemented. One documentation inconsistency remains.\n\nFindings\n\nMINOR | Stale human-readable verification evidence | docs/sdlc/verify-evidence.json records tested HEAD 75ee95ba, 338 tests, 337 passed and 1 skipped, whereas docs/sdlc/verify-evidence.md still reports tested HEAD 2d6743d, 323 tests, 322 passed and 1 skipped (attachment lines 681\u2013693 and 730\u2013747) | The PM-GPT packet includes both files, presenting contradictory verification summaries. Although the structured JSON is the mechanical authority, a reviewer could mistake the older Markdown result for the latest verification | Update verify-evidence.md to reflect the 338-test run and explicitly identify JSON as authoritative. No product-code change or additional test run is required for this documentation correction.\n\nPrevious findings \u2014 disposition\n\nFinding\n\n\t\n\nStatus\n\n\t\n\nEvidence\n\n\n\n\nZero passing tests accepted\n\n\t\n\nRESOLVED\n\n\t\n\ntools/af/evidence.py: every declared run requires passed > 0; all-skipped runs are rejected\n\n\n\n\nEmpty reviewer roster accepted\n\n\t\n\nRESOLVED\n\n\t\n\nEmpty reviewers requires a nonblank reviewers_waived_reason\n\n\n\n\nForeign STATE.md overwritten\n\n\t\n\nRESOLVED\n\n\t\n\nstate_view_name() redirects generated output to AF_STATE.md when STATE.md lacks the framework-generated marker\n\n\n\n\nCLI activation omits phase instructions\n\n\t\n\nRESOLVED\n\n\t\n\nSuccessful cmd_on() prints the canonical phase context for new and resumed sessions\n\nThe added regression tests cover zero-pass evidence rejection, mixed successful/skipped runs, invalid reviewer-waiver reasons, preservation of tracked and untracked foreign state files, and activation-context behavior.\n\nVerification evidence\n\nThe supplied report records:\n\nMetric\n\n\t\n\nResult\n\n\n\n\nTotal tests\n\n\t\n\n338\n\n\n\n\nPassed\n\n\t\n\n337\n\n\n\n\nFailed\n\n\t\n\n0\n\n\n\n\nErrors\n\n\t\n\n0\n\n\n\n\nSkipped\n\n\t\n\n1\n\n\n\n\nTested HEAD\n\n\t\n\n75ee95ba\n\nThese results are author-reported. I did not independently execute the Windows repository or the complete suite.\n\nThe remaining declared NOT_RUN activities include live PM Bridge integration, real scheduled-task/registry operations, installation into real user homes during tests, and a phase-8 push using genuine approval. They remain disclosed limitations rather than newly established defects in this remediation.\n\nFinal decision\n\nMINOR \u2014 no blocking findings established for exact HEAD 28b6830590f383a0ec6d5553df156bb60da1ec4c.\n\nThe scoped remediation is acceptable for push under the stated Gate policy, subject to correcting the stale Markdown verification summary. This verdict does not certify unexecuted live integrations or independently verify the remote Git HEAD.",
+  "receipt_written": true
+}

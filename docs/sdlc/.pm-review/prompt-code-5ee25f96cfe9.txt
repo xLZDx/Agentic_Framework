@@ -1,0 +1,1989 @@
+Code review request for project "agentic_framework".
+
+Scope of THIS round -- read before reviewing:
+# PM-GPT code review request
+Project root: D:\Repo\Agentic_Framework
+Reviewed range: b9b4fe1...5ee25f96cfe9fe26c4ec98dd0e0673b661926350
+Exact HEAD under review: 5ee25f96cfe9fe26c4ec98dd0e0673b661926350
+Reply format: first line `VERDICT: APPROVE|MINOR|MAJOR|BLOCKER`, then one finding per line as `SEVERITY | basis | claim | evidence | required change`.
+Approve only if the exact head is safe to push. Verify claims against the diff.
+
+## Evidence file: verify-evidence.json (sha256 280577e634e9cbd55b3e7539e05bf3b2285c50a076a3739011d554be66266b93)
+{
+  "tested_head": "2d6743dc6e0db7f9967a3c2b526a4884f088a4b3",
+  "runs": [
+    {
+      "command": "python -m unittest discover -s tests -v",
+      "total": 323,
+      "passed": 322,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 1,
+      "log": "full12.log (799 s)"
+    }
+  ],
+  "not_run": [
+    {
+      "item": "real PM Bridge review.js dump-only mode with a live review",
+      "reason": "tests use a fake review.js; the real one was only exercised manually (two identical prompt dumps)"
+    },
+    {
+      "item": "real schtasks and registry operations",
+      "reason": "tests assert argv only; no real system state is changed by tests"
+    },
+    {
+      "item": "install into the real ~/.claude and ~/.codex from tests",
+      "reason": "tests use temp homes; NeverTouchesRealHomes self-skips because a real install exists"
+    },
+    {
+      "item": "phase-8 git push through the pre-push hook with a genuine approval",
+      "reason": "covered only by gate_decision and fake-approval tests"
+    },
+    {
+      "item": "mutation checks",
+      "reason": "not run by operator policy"
+    }
+  ],
+  "findings": {
+    "open_blocker": 0,
+    "open_major": 0
+  },
+  "reviewers": [
+    {
+      "role": "functional-test-reviewer",
+      "model": "sonnet",
+      "effort": "medium",
+      "verdict": "suite green 322/323, 1 self-skip, no open product bugs"
+    }
+  ]
+}
+
+
+## Evidence file: verify-evidence.md (sha256 9493f26ebd333e2b2d614897c94ae8251c4a41b67f7f93b5768e4ae5a5572083)
+# Verify evidence - Agentic_Framework
+
+Machine-readable evidence: `docs/sdlc/verify-evidence.json` (validated by tools/af/evidence.py before a review is sent).
+
+## Test evidence
+Tested head 2d6743dc6e0db7f9967a3c2b526a4884f088a4b3: `python -m unittest discover -s tests -v` = 323 tests, 322 OK, 0 failed, 0 errors, 1 self-skip (guard that skips when the real home already has an install manifest), 799 s, run by the functional-test-reviewer agent on exactly this tree.
+
+## History of the review
+- Round 1 (head 9befa56): MAJOR x3, MINOR x2 - remediated (change 0005).
+- Round 2 (7728951): MAJOR x2 - remediated (change 0006).
+- Round 3 (4dcd4ba): APPROVE.
+- Root commit 20c0098 reviewed separately: MAJOR x4, MINOR x2 - remediated (change 0007).
+- Round 4 (b9b4fe1): MAJOR x2 left open (heading-only evidence, mtime freshness) plus input-hash correspondence - closed by this change set (change 0009): structured evidence, sprint-bound artifacts with digests, pre-computed prompt hash comparison.
+
+## NOT_RUN
+See the not_run list in verify-evidence.json (real PM Bridge dump mode, real schtasks/registry, installs into real homes, phase-8 push through the pre-push hook with a genuine approval, mutation checks).
+
+## Known gaps
+- Approval files are guarded by tooling and digests, not cryptography.
+- Text-based push detection is best effort; the git pre-push hook is the boundary.
+- `status` does not yet print the exact artifact requirements (backlog item 1).
+
+Findings outside that scope are still welcome, but mark them explicitly as out-of-scope and do NOT let them set the VERDICT line: the verdict must answer the scoped question. If the scoped question is genuinely satisfied, say APPROVE even when out-of-scope work remains -- an unrelated open item is not a reason to withhold a verdict on this one.
+
+Reply with a VERDICT line first (APPROVE, or BLOCKER/MAJOR/MINOR findings), then each finding as: severity | claim | evidence | failure scenario | required change.
+
+Apply a devil's-advocate stance throughout: actively look for reasons this change is wrong, unsafe, incomplete, or will break something, rather than defaulting to approval. This does not license inventing problems that aren't real: every objection still needs the same real file/line evidence required above -- if after genuinely trying to find a problem there is none, say so plainly rather than manufacturing a NIT to seem thorough.
+
+Diff:
+```diff
+diff --git a/core/BACKLOG.md b/core/BACKLOG.md
+new file mode 100644
+index 0000000..eb11b02
+--- /dev/null
++++ b/core/BACKLOG.md
+@@ -0,0 +1,11 @@
++# Backlog
++
++## Closed (2026-10-29, change 0009)
++1. Structured verification evidence: `docs/sdlc/verify-evidence.json` is validated by `tools/af/evidence.py` before any code review is sent (runs, counts, red runs, not_run reasons, open blocker/major, tested head ancestry and code-after-tested-head).
++2. Artifact provenance: every sprint has a `sprint_id`; phase artifacts must contain it; legacy states need an explicit `af_cli.py migrate`; artifact digests are stored at each transition and re-checked by `verify`.
++3. Review input binding: `pm-review` pre-computes the exact review.js prompt (dump-only mode) and rejects a result whose `reviewInputHash` differs.
++
++## Open
++1. `af_cli.py status` should print the exact artifact requirements (file names, the `Sprint: <id>` stamping line, where to write them) so an agent does not read the framework source and trigger permission prompts (operator report, Codex session of 2026-10-29).
++2. Not exercised against the real PM Bridge: review.js dump-only mode with a live review; a phase-8 push through the pre-push hook with a genuine approval.
++3. Installed files are LF while deploy/ files are CRLF on Windows (cosmetic).
+diff --git a/core/DECISION_LOG.md b/core/DECISION_LOG.md
+index 3f82202..2b00453 100644
+--- a/core/DECISION_LOG.md
++++ b/core/DECISION_LOG.md
+@@ -16,6 +16,10 @@
+ - PM-GPT review round 1 (head 9befa56): verdict MAJOR (3 MAJOR, 2 MINOR); all findings verified as valid and remediated in one batch (change 0005). Decision: the shell-text push detection is best effort; the git pre-push hook installed by `/af on` is the authoritative gate. Installer never overwrites or deletes user-edited files (hash manifest).
+ - PM-GPT review round 2 (head 7728951): verdict MAJOR with 2 new findings, round-1 findings confirmed fixed. Decisions: in hard mode the framework refuses activation when the git pre-push gate cannot be installed (no silent best-effort); the installer claims ownership only of files it created or that were already in its manifest. Remediated in change 0006.
+ - PM-GPT review round 3 on head 4dcd4ba: APPROVE (approval PMG-20261028-4dcd4ba9). Separate GPT-PM review of the root commit 20c0098: MAJOR (4 MAJOR + 2 MINOR in the original design). Decisions: remediate all in change 0007 although the pushed head was already approved, because the findings were verified against the current code and --force bypass and stale-artifact reuse are real contract violations; `--force` can no longer skip a required PM approval; artifacts must be newer than the sprint start; reviews need a compliant evidence file and a base that covers the sprint.
++- PM-GPT review round 4 (4dcd4ba...b9b4fe1): MAJOR, 2 MAJOR open (heading-only evidence preflight; mtime-based artifact freshness), 4 original findings confirmed resolved or partly resolved. Evidence: reviewer reply recorded in the session. Decision: no fifth fix round without the operator's choice; items moved to core/BACKLOG.md; b9b4fe1 is not approved, the last approved head is 4dcd4ba.
++- Backlog closure (operator command "close the backlog and merge everything into master", 2026-10-29): the operator's explicit command supersedes the earlier "stop at the backlog" choice, which had been auto-accepted by the question policy while the operator was silent. Implemented structured evidence, sprint-bound artifacts and review-input hash binding (change 0009); suite 323 tests, 322 OK, 1 self-skip. There is only one branch (master), so nothing else to merge.
++- Evidence commit (change 0010): docs/sdlc/verify-evidence.json with tested_head 2d6743d (323 tests, 322 OK, 1 self-skip); it passes tools/af/evidence.py validation (docs-only changes after the tested head are allowed). Next step: GPT-PM review of the range b9b4fe1...HEAD.
++- Operator-approved environment changes: user TEMP/TMP moved off D:\Temp (Codex sandbox could not grant itself write access there: Access denied on WRITE_DAC); allow rules for the framework CLI (not pm-review) added to the Codex rules file.
+ - Autostart fallback: schtasks ONLOGON returned "Access is denied" without admin, so register falls back to the per-user HKCU Run key (no elevation). Verified by 165-test run (164 OK, 1 self-skip).
+ - Autostart (operator request): tools/af_autostart.py registers a Windows logon task and a VS Code folder-open task that only sync the installed copy; enabling the framework in a project stays `/af on`.
+ - Global installation stays opt-in: tools/af_install.py (dry-run, backups, manifest for exact uninstall). The operator chose to install only this framework, not the ADK installer.
+diff --git a/core/LESSONS_LOG.md b/core/LESSONS_LOG.md
+index 7c16da6..ca2a886 100644
+--- a/core/LESSONS_LOG.md
++++ b/core/LESSONS_LOG.md
+@@ -8,5 +8,9 @@
+ - 2026-10-28 PM review remediation - FAILURE (author, tests): shell-text push detection could be bypassed (env/command/sh -c), the installer overwrote and deleted user-edited files, and a moved checkout left stale hooks. Evidence: GPT-PM review verdict MAJOR on 9befa56. Root cause: designed the happy path; the 165 tests asserted the author's own cases. Caught by the external PM-GPT gate, not by tests or the author. Rule: enforce gates at the tool boundary (git pre-push), never only by parsing command text; any installer that overwrites or deletes must compare content hashes first; ask the test agent for adversarial bypass cases before the PM review.
+ - 2026-10-29 PM review round 2 - FAILURE (author, tests): my round-1 fix reported success while the new authoritative gate could be absent, and a test enshrined that behaviour (test_foreign_prepush_left_untouched); the SAME-file branch claimed ownership of identical foreign files. Caught by the external GPT-PM round 2, not by tests. Rule: when a safeguard is the point of a feature, activation must fail closed if the safeguard cannot be installed, and tests must assert the refusal; ownership of a file is claimed only for files the tool created.
+ - 2026-10-29 root-commit review remediation - FAILURE (author, tests): the original design let `--force` skip the mandatory PM approval, accepted a review with no evidence, trusted file existence as phase completion and did not validate the review base; 165-243 tests asserted these behaviours (one test even named "force bypasses approval"). Caught by the GPT-PM review of the root commit, which the three diff-range rounds had not covered. Rule: review the root commit/initial design as soon as the repository exists (use --commit); a mandatory gate must have no routine override; tests must not enshrine an override of a stated contract.
++- 2026-10-29 round 4 outcome - SHORTCOMING (author): my fixes for evidence and freshness checked headings and mtime, which a strict reviewer correctly called proxies for the real property; tests enshrined the proxies. Rule: when a reviewer asks for a property (verified evidence, provenance), implement the property (structured data, digests), not a cheap proxy; and bound the number of fix rounds on an internal mechanism up front.
++- 2026-10-29 evidence commit - SUCCESS: the repository's own structured evidence passes its own validator (tested head is the commit whose tree the agent ran), so the gate is exercised on the project that ships it.
++- 2026-10-29 backlog closure - SUCCESS: asking the test agent to treat the author's code as read-only and report bugs surfaced three real defects (phase 8 could never advance after a genuine approval, null evidence fields accepted, CRLF breaking the prompt hash on Windows) before any PM review. Rule: always let the test agent exercise the full real flow end to end (approve then advance), not only the unit contracts.
++- 2026-10-29 backlog closure - SHORTCOMING (author, process): `status` did not tell agents what the artifacts must contain, so a Codex agent read the framework source and triggered a stream of permission prompts. Rule: a CLI that drives an agent must print everything the agent needs for the next step.
+ - 2026-10-28 import agents, /af toggle - SUCCESS: independent test agent found the push-gate defect before any real use; full suite 161/161 after fixes.
+ - 2026-10-28 import agents, /af toggle - SHORTCOMING (author): scripted multi-line edits through Python heredocs corrupted string escapes twice. Rule: use the Edit tool for source that has backslashes or newlines in string literals.
+diff --git a/deploy/codex/prompts/af.md b/deploy/codex/prompts/af.md
+index 52ef445..baa1f10 100644
+--- a/deploy/codex/prompts/af.md
++++ b/deploy/codex/prompts/af.md
+@@ -14,5 +14,3 @@ Run exactly one command with the shell, from the project root, and report its ou
+ - `status`, `next`, `verify`, `pm-review ...` : pass through to `python {fw}/tools/af_cli.py <command>`.
+ 
+ After `on`, follow the injected phase line and launch the listed roles as real agents. Never run `pm-review` or `next` on your own initiative unless the phase flow calls for it, and never hand-write the approval files. With no argument, run `status`.
+-
+-Arguments: $ARGUMENTS
+diff --git a/docs/changes/0008-round4-outcome-and-backlog.md b/docs/changes/0008-round4-outcome-and-backlog.md
+new file mode 100644
+index 0000000..e373228
+--- /dev/null
++++ b/docs/changes/0008-round4-outcome-and-backlog.md
+@@ -0,0 +1,5 @@
++# Change 0008 - outcome of the fourth PM-GPT review round, backlog
++
++Round 4 (range 4dcd4ba...b9b4fe1) confirmed the --force, effort, state-authority fixes and part of the base validation, and kept two MAJOR open: heading-only evidence preflight and mtime-based artifact freshness.
++Decision: these are design limits of an internal gate, not regressions of the remediation, and this is the fourth fix round on that mechanism. They are recorded in core/BACKLOG.md instead of another fix round, pending the operator's choice. No code changed. The last approved head remains 4dcd4ba (approval PMG-20261028-4dcd4ba9); b9b4fe1 is NOT approved.
++Verification: documentation only.
+diff --git a/docs/changes/0009-close-backlog-evidence-provenance-input-binding.md b/docs/changes/0009-close-backlog-evidence-provenance-input-binding.md
+new file mode 100644
+index 0000000..574c054
+--- /dev/null
++++ b/docs/changes/0009-close-backlog-evidence-provenance-input-binding.md
+@@ -0,0 +1,14 @@
++# Change 0009 - close the review backlog
++
++Closes the three items opened by GPT-PM round 4 (see core/BACKLOG.md).
++
++What changed
++- tools/af/evidence.py (new): structured verification evidence validation. Rejects red or empty runs, contradictory counts, missing not_run reasons, open blocker/major findings, a tested head that is not an ancestor, and code changed after the tested head (only docs/ and the three core logs may change).
++- tools/af/core.py, tools/af_cli.py, tools/af/hook.py: sprint_id; artifacts must contain it; `migrate` for legacy states; artifact digests in history; sprint id shown by status and the hook context line; friendly error outside a git repository.
++- tools/af/pm_review.py: evidence and artifact preflight; pre-computed review.js prompt and `reviewInputHash` comparison; byte-exact (LF, raw bytes) packet and prompt handling; approval records expected_input_hash, diff digests, evidence digest, sprint id and artifact digests; verify() fails when an artifact changed after approval; gate-approval.md carries `Sprint: <id>`.
++- tools/af/deploy.py: Codex prompt no longer carries a literal `$ARGUMENTS` line.
++- tests: tests/test_round5.py, tests/test_nongit.py, adapted existing tests.
++
++Verification (agent functional-test-reviewer, `python -m unittest discover -s tests -v`, tree identical to this commit): 323 tests, 322 OK, 0 failed, 0 errors, 1 self-skip, 799 s. Three product bugs found by the agent during the work (approval file lacked the sprint stamp so phase 8 could never advance; null evidence fields accepted; CRLF would break the prompt hash on Windows) were fixed before this run.
++NOT_RUN: real PM Bridge review.js dump mode, real schtasks/registry, installs into real homes, a phase-8 push through the pre-push hook with a genuine approval.
++Also done outside the repository (operator-approved): user TEMP/TMP moved to C:\Users\koros\AppData\Local\Temp (rollback values in ~/.claude/af-temp-env-backup.json) and allow rules for the framework CLI added to ~/.codex/rules/default.rules to stop Codex permission prompts.
+diff --git a/docs/changes/0010-structured-verify-evidence.md b/docs/changes/0010-structured-verify-evidence.md
+new file mode 100644
+index 0000000..086b483
+--- /dev/null
++++ b/docs/changes/0010-structured-verify-evidence.md
+@@ -0,0 +1,3 @@
++# Change 0010 - structured verify evidence for this repository
++
++Adds docs/sdlc/verify-evidence.json (the machine-readable evidence the new preflight requires) and rewrites docs/sdlc/verify-evidence.md for the final review round. Documentation only; tested head is 2d6743d (code and tests unchanged since that commit).
+diff --git a/docs/sdlc/.pm-review/packet-code-b9b4fe1af892.md b/docs/sdlc/.pm-review/packet-code-b9b4fe1af892.md
+new file mode 100644
+index 0000000..c672878
+--- /dev/null
++++ b/docs/sdlc/.pm-review/packet-code-b9b4fe1af892.md
+@@ -0,0 +1,45 @@
++# PM-GPT code review request
++Project root: D:\Repo\Agentic_Framework
++Reviewed range: 4dcd4ba...b9b4fe1af8922822d49c5aebcab78072491e5d2f
++Exact HEAD under review: b9b4fe1af8922822d49c5aebcab78072491e5d2f
++Reply format: first line `VERDICT: APPROVE|MINOR|MAJOR|BLOCKER`, then one finding per line as `SEVERITY | basis | claim | evidence | required change`.
++Approve only if the exact head is safe to push. Verify claims against the diff.
++
++## Evidence file: verify-evidence.md
++# Verify evidence - Agentic_Framework (first PM-GPT review)
++
++Scope: the whole repository as pushed to origin/master (commits 20c0098, dc12906, 1689530). The reviewed diff range is 20c0098...HEAD (167 files; mostly imported agents/skills, generated deploy/, tests, installer, autostart, push-gate fix). The root commit 20c0098 (initial tools/af core, pm_review.py, hook.py, phase map, skills) is outside that range because git cannot diff against an empty base with `...`; it is reviewed separately with `review.js --commit 20c0098`.
++
++## Test evidence (author: functional-test-reviewer agent, MEASURED)
++- Command: `python -m unittest discover -s tests -v` from D:\Repo\Agentic_Framework.
++- Run 1: 93 tests, 90 OK, 3 failed (push gate matched the word "push" in any git command) - fixed by tokenised `is_push_command`.
++- Run 2: 161 tests, 160 OK, 1 failed (phase 6 role implementation-engineer not bundled) - fixed.
++- Run 3: 161/161 OK. Run 4 (after autostart Run-key fallback): 165 tests, 164 OK, 0 failed, 1 self-skip (guard that disables itself when the real home already has the install manifest). 299 s.
++
++## Remediation round (verification of the first PM-GPT review, MAJOR x3 + MINOR x2)
++Reviewed range for this round: 9befa56...HEAD. Fixes: (1) push detection tokenises with quote awareness, handles wrappers (env/command/sudo/timeout/...), nested shells (sh -c, cmd /c, pwsh -Command), subshells and backticks; `gh pr` no longer raises; `/af on` installs the git pre-push hook as the authoritative boundary. (2) installer manifest records sha256 per file; user-edited files are never refreshed or removed (MODIFIED/KEPT); uninstall keeps the manifest for kept files. (3) stale framework hooks (moved checkout) are replaced, exactly one per event, unrelated hooks preserved. (4) bytecode no longer tracked.
++Evidence (agent functional-test-reviewer, MEASURED): full suite 192 tests = 190 OK, 1 stale test of the old installer behaviour (fixed to assert the new behaviour), 1 self-skip, 697 s. Afterwards test_af_install + test_hardening + test_autostart: 66 tests, 65 OK, 0 failed, 1 self-skip, 188 s (includes the new uninstall-keeps-manifest test). The full suite was not re-run after the last one-line uninstall fix; the three affected files were.
++Real-push coverage: against a local bare remote, `git push`, `env git push` and `sh -c 'git push'` are blocked at phase 1 by the pre-push hook and allowed after `off`.
++Known limitation: push-command text detection is best-effort; the pre-push hook is the boundary. A push at phase 8+ with a valid approval through the pre-push hook is covered only by gate_decision tests.
++
++## Remediation round 2 (GPT-PM round 2: 2 MAJOR, previous 5 findings confirmed fixed)
++Reviewed range: 7728951...HEAD. Fixes: (1) hard mode `start`/`on`/`mode hard` install the git pre-push gate first and refuse activation when a foreign pre-push hook prevents it; soft mode only warns. (2) installer does not record a pre-existing byte-identical file as owned unless it was in the previous manifest, so uninstall never deletes it.
++Evidence (agent functional-test-reviewer, MEASURED): full suite `python -m unittest discover -s tests -v`: 205 tests, 204 OK, 0 failed, 0 errors, 1 self-skip, 582 s. 13 tests added in tests/test_hardening.py (8 pre-push contract, 4 identical-foreign-file installer, 1 stale-hook rewrite).
++
++## Remediation round 3 (GPT-PM review of the root commit 20c0098: 4 MAJOR + 2 MINOR; round 3 on 4dcd4ba was APPROVE)
++Reviewed range: 4dcd4ba...HEAD. Fixes: pm-review preflight (evidence file must contain "## Test evidence" and "## NOT_RUN"; base must be a commit, an ancestor of HEAD and of the sprint start_head, range non-empty; approval records base_sha, diff_sha256, evidence_sha256); `next --force` never bypasses a required PM approval; artifacts count only if written after the sprint started (started_epoch/start_head recorded); per-agent effort preserved when allowed (claude low/medium/high, codex low/medium); tools/vst references removed from core.
++Evidence (agent functional-test-reviewer, MEASURED): full suite `python -m unittest discover -s tests -v`: 243 tests, 242 OK, 0 failed, 0 errors, 1 self-skip, 572 s. 38 tests added (tests/test_round4.py); 24 existing tests were adapted to the new contracts (evidence file in temp repos, --force semantics, derived effort).
++
++## NOT_RUN
++- Real `schtasks`/registry operations inside tests (argv-level checks only).
++- No test installs into the real ~/.claude or ~/.codex.
++- PM Bridge real `review.js` is never called by tests (fake script used).
++- Mutation checks: not run by operator policy.
++
++## Known gaps
++- Approval files are guarded by tooling, not cryptography.
++- Installed files are LF while deploy/ files are CRLF on Windows (cosmetic).
++- Imported agents and skills (36 + 8) are copied unchanged from the operator's agents-skills-repo; they are not reviewed here beyond deploy-format validity.
++
++## Reviewer consensus
++No separate specialist reviewer round was run for this repository; the independent evidence is the test agent's findings above.
+diff --git a/docs/sdlc/.pm-review/result-code-b9b4fe1af892.json b/docs/sdlc/.pm-review/result-code-b9b4fe1af892.json
+new file mode 100644
+index 0000000..3505ffd
+--- /dev/null
++++ b/docs/sdlc/.pm-review/result-code-b9b4fe1af892.json
+@@ -0,0 +1,19 @@
++{
++  "ok": true,
++  "error": null,
++  "review_status": "RAN",
++  "round": 1,
++  "final": false,
++  "truncated": false,
++  "final_overridden": true,
++  "verdict": "MAJOR",
++  "verdict_contradiction": false,
++  "correlated": true,
++  "replyId": "34ea796b-3e85-4ce7-b357-d85475a1f580",
++  "reviewRequestId": "946fd480-3662-41fa-9e2c-4236d11e87a4",
++  "reviewInputHash": "89f873f13d0805f75f9020ea21add2ae9af3d07137e4f53925ea73fbcc9ca048",
++  "conversation": "6ae267b7-a2dc-83eb-8a3f-b929883d34a8",
++  "recovered": false,
++  "reply": "ChatGPT said:\n\nREQUEST_ID: 946fd480-3662-41fa-9e2c-4236d11e87a4\n\nVERDICT: MAJOR\n\nScope: 4dcd4ba...b9b4fe1af8922822d49c5aebcab78072491e5d2f\n\nBLOCKER: 0 | MAJOR: 2 | MINOR: 0\n\nThe supplied remediation resolves the --force bypass, per-agent effort mapping, and obsolete state-authority references. However, two of the original MAJOR findings remain incompletely addressed.\n\nMAJOR-01 | Evidence preflight checks headings, not verification results\n\nSeverity: MAJOR | Basis: Original MAJOR-01, incomplete remediation.\n\nClaim: A code review can still receive an approval without successful verification evidence.\n\nEvidence: tools/af/pm_review.py, _preflight(), added lines 940\u2013950. The preflight checks only whether verify-evidence.md contains the strings ## Test evidence and ## NOT_RUN.\n\ntests/test_round4.py, lines 475\u2013476 and 651\u2013653, explicitly demonstrate that the following evidence passes the preflight and permits approval:\n\nMarkdown\n# Evidence\n\n## Test evidence\nall green\n\n## NOT_RUN\nnothing\n\nThere is no validation of actual test results, required checks, reviewer consensus, unresolved BLOCKER/MAJOR findings, or the disposition of skipped tests.\n\nFailure scenario: An agent writes those headings and arbitrary text, then invokes pm-review. A correlated PM Bridge APPROVE satisfies _accept(), and the framework records approval despite the absence of meaningful verification evidence.\n\nRequired change: Introduce structured verification evidence with explicit test status, required-check coverage, NOT_RUN dispositions, and blocking-finding status. Reject incomplete or contradictory evidence before invoking PM Bridge. Keep the independent PM reviewer responsible for evaluating whether the evidence is sufficient; do not equate a heading's presence with successful verification.\n\nMAJOR-02 | Artifact freshness remains based on mutable filesystem timestamps\n\nSeverity: MAJOR | Basis: Original MAJOR-02, incomplete remediation.\n\nClaim: The new freshness check does not establish that an artifact belongs to the current sprint.\n\nEvidence: tools/af/core.py, added lines 873\u2013885:\n\nPython\nRun\nfor f in glob.glob(str(state_dir(project) / pattern)):\n    if since is None or os.path.getmtime(f) >= since:\n        return True\n\nThe implementation compares modification time with started_epoch. It does not validate sprint identity, artifact content, author, or source revision.\n\ntests/test_round4.py, lines 492\u2013505, demonstrates that rewriting an old artifact after sprint start makes it acceptable. Lines 537\u2013542 also explicitly preserve existence-only behavior for legacy states without started_epoch.\n\nFailure scenario: A previous sprint's design.md or verify-evidence.md is touched, copied, or rewritten after a new sprint begins. Its modification timestamp is recent, so the framework treats it as a valid current-sprint artifact without checking its relevance.\n\nA legacy state without started_epoch bypasses the freshness check entirely.\n\nRequired change: Bind required artifacts to a sprint identifier and applicable revision or content digest. Verify that provenance during phase transitions. For legacy states, require explicit migration or revalidation instead of silently accepting existence-only checks.\n\nVerification of the other four findings\n\nOriginal finding\n\n\t\n\nResult\n\n\n\n\nMAJOR-03: --force bypasses PM approval\n\n\t\n\nRESOLVED \u2014 cmd_next() now requires valid PM approval regardless of --force; negative tests cover missing and stale approvals\n\n\n\n\nMAJOR-04: Unvalidated review base\n\n\t\n\nPARTIALLY RESOLVED \u2014 ancestry, sprint-baseline coverage and nonempty range are checked; digests are recorded, but their correspondence to the PM Bridge-reviewed input is not independently verified\n\n\n\n\nMINOR-01: Per-agent effort lost\n\n\t\n\nRESOLVED \u2014 target-specific allowed values are preserved, including Claude UI designer high\n\n\n\n\nMINOR-02: Conflicting state authority\n\n\t\n\nRESOLVED \u2014 core instructions now consistently designate docs/sdlc/state.json\n\nThe remaining input-digest concern is part of the original MAJOR-04 contract, but the supplied diff does not demonstrate a separate exploitable mismatch. I am therefore not counting it as an additional MAJOR in this round. It should be verified in the next focused correction.\n\nTest evidence\n\nThe supplied report states that python -m unittest discover -s tests -v completed with 243 tests, 242 passed, zero failures, zero errors and one self-skip.\n\nThat is reported evidence, not an independently executed test run. The tests demonstrate the new implementation's behavior, but some currently assert the insufficient contracts identified above.\n\nFinal decision: MAJOR \u2014 NOT APPROVED for push at HEAD b9b4fe1af8922822d49c5aebcab78072491e5d2f.\n\nRemediate the two remaining MAJOR findings together, verify review-input digest correspondence as part of MAJOR-04 closure, and provide focused regression tests. No unrelated changes are required for this gate.",
++  "receipt_written": true
++}
+\ No newline at end of file
+diff --git a/docs/sdlc/verify-evidence.json b/docs/sdlc/verify-evidence.json
+new file mode 100644
+index 0000000..54c083a
+--- /dev/null
++++ b/docs/sdlc/verify-evidence.json
+@@ -0,0 +1,48 @@
++{
++  "tested_head": "2d6743dc6e0db7f9967a3c2b526a4884f088a4b3",
++  "runs": [
++    {
++      "command": "python -m unittest discover -s tests -v",
++      "total": 323,
++      "passed": 322,
++      "failed": 0,
++      "errors": 0,
++      "skipped": 1,
++      "log": "full12.log (799 s)"
++    }
++  ],
++  "not_run": [
++    {
++      "item": "real PM Bridge review.js dump-only mode with a live review",
++      "reason": "tests use a fake review.js; the real one was only exercised manually (two identical prompt dumps)"
++    },
++    {
++      "item": "real schtasks and registry operations",
++      "reason": "tests assert argv only; no real system state is changed by tests"
++    },
++    {
++      "item": "install into the real ~/.claude and ~/.codex from tests",
++      "reason": "tests use temp homes; NeverTouchesRealHomes self-skips because a real install exists"
++    },
++    {
++      "item": "phase-8 git push through the pre-push hook with a genuine approval",
++      "reason": "covered only by gate_decision and fake-approval tests"
++    },
++    {
++      "item": "mutation checks",
++      "reason": "not run by operator policy"
++    }
++  ],
++  "findings": {
++    "open_blocker": 0,
++    "open_major": 0
++  },
++  "reviewers": [
++    {
++      "role": "functional-test-reviewer",
++      "model": "sonnet",
++      "effort": "medium",
++      "verdict": "suite green 322/323, 1 self-skip, no open product bugs"
++    }
++  ]
++}
+diff --git a/docs/sdlc/verify-evidence.md b/docs/sdlc/verify-evidence.md
+index 1958a89..bd98852 100644
+--- a/docs/sdlc/verify-evidence.md
++++ b/docs/sdlc/verify-evidence.md
+@@ -1,37 +1,21 @@
+-# Verify evidence - Agentic_Framework (first PM-GPT review)
++# Verify evidence - Agentic_Framework
+ 
+-Scope: the whole repository as pushed to origin/master (commits 20c0098, dc12906, 1689530). The reviewed diff range is 20c0098...HEAD (167 files; mostly imported agents/skills, generated deploy/, tests, installer, autostart, push-gate fix). The root commit 20c0098 (initial tools/af core, pm_review.py, hook.py, phase map, skills) is outside that range because git cannot diff against an empty base with `...`; it is reviewed separately with `review.js --commit 20c0098`.
++Machine-readable evidence: `docs/sdlc/verify-evidence.json` (validated by tools/af/evidence.py before a review is sent).
+ 
+-## Test evidence (author: functional-test-reviewer agent, MEASURED)
+-- Command: `python -m unittest discover -s tests -v` from D:\Repo\Agentic_Framework.
+-- Run 1: 93 tests, 90 OK, 3 failed (push gate matched the word "push" in any git command) - fixed by tokenised `is_push_command`.
+-- Run 2: 161 tests, 160 OK, 1 failed (phase 6 role implementation-engineer not bundled) - fixed.
+-- Run 3: 161/161 OK. Run 4 (after autostart Run-key fallback): 165 tests, 164 OK, 0 failed, 1 self-skip (guard that disables itself when the real home already has the install manifest). 299 s.
++## Test evidence
++Tested head 2d6743dc6e0db7f9967a3c2b526a4884f088a4b3: `python -m unittest discover -s tests -v` = 323 tests, 322 OK, 0 failed, 0 errors, 1 self-skip (guard that skips when the real home already has an install manifest), 799 s, run by the functional-test-reviewer agent on exactly this tree.
+ 
+-## Remediation round (verification of the first PM-GPT review, MAJOR x3 + MINOR x2)
+-Reviewed range for this round: 9befa56...HEAD. Fixes: (1) push detection tokenises with quote awareness, handles wrappers (env/command/sudo/timeout/...), nested shells (sh -c, cmd /c, pwsh -Command), subshells and backticks; `gh pr` no longer raises; `/af on` installs the git pre-push hook as the authoritative boundary. (2) installer manifest records sha256 per file; user-edited files are never refreshed or removed (MODIFIED/KEPT); uninstall keeps the manifest for kept files. (3) stale framework hooks (moved checkout) are replaced, exactly one per event, unrelated hooks preserved. (4) bytecode no longer tracked.
+-Evidence (agent functional-test-reviewer, MEASURED): full suite 192 tests = 190 OK, 1 stale test of the old installer behaviour (fixed to assert the new behaviour), 1 self-skip, 697 s. Afterwards test_af_install + test_hardening + test_autostart: 66 tests, 65 OK, 0 failed, 1 self-skip, 188 s (includes the new uninstall-keeps-manifest test). The full suite was not re-run after the last one-line uninstall fix; the three affected files were.
+-Real-push coverage: against a local bare remote, `git push`, `env git push` and `sh -c 'git push'` are blocked at phase 1 by the pre-push hook and allowed after `off`.
+-Known limitation: push-command text detection is best-effort; the pre-push hook is the boundary. A push at phase 8+ with a valid approval through the pre-push hook is covered only by gate_decision tests.
+-
+-## Remediation round 2 (GPT-PM round 2: 2 MAJOR, previous 5 findings confirmed fixed)
+-Reviewed range: 7728951...HEAD. Fixes: (1) hard mode `start`/`on`/`mode hard` install the git pre-push gate first and refuse activation when a foreign pre-push hook prevents it; soft mode only warns. (2) installer does not record a pre-existing byte-identical file as owned unless it was in the previous manifest, so uninstall never deletes it.
+-Evidence (agent functional-test-reviewer, MEASURED): full suite `python -m unittest discover -s tests -v`: 205 tests, 204 OK, 0 failed, 0 errors, 1 self-skip, 582 s. 13 tests added in tests/test_hardening.py (8 pre-push contract, 4 identical-foreign-file installer, 1 stale-hook rewrite).
+-
+-## Remediation round 3 (GPT-PM review of the root commit 20c0098: 4 MAJOR + 2 MINOR; round 3 on 4dcd4ba was APPROVE)
+-Reviewed range: 4dcd4ba...HEAD. Fixes: pm-review preflight (evidence file must contain "## Test evidence" and "## NOT_RUN"; base must be a commit, an ancestor of HEAD and of the sprint start_head, range non-empty; approval records base_sha, diff_sha256, evidence_sha256); `next --force` never bypasses a required PM approval; artifacts count only if written after the sprint started (started_epoch/start_head recorded); per-agent effort preserved when allowed (claude low/medium/high, codex low/medium); tools/vst references removed from core.
+-Evidence (agent functional-test-reviewer, MEASURED): full suite `python -m unittest discover -s tests -v`: 243 tests, 242 OK, 0 failed, 0 errors, 1 self-skip, 572 s. 38 tests added (tests/test_round4.py); 24 existing tests were adapted to the new contracts (evidence file in temp repos, --force semantics, derived effort).
++## History of the review
++- Round 1 (head 9befa56): MAJOR x3, MINOR x2 - remediated (change 0005).
++- Round 2 (7728951): MAJOR x2 - remediated (change 0006).
++- Round 3 (4dcd4ba): APPROVE.
++- Root commit 20c0098 reviewed separately: MAJOR x4, MINOR x2 - remediated (change 0007).
++- Round 4 (b9b4fe1): MAJOR x2 left open (heading-only evidence, mtime freshness) plus input-hash correspondence - closed by this change set (change 0009): structured evidence, sprint-bound artifacts with digests, pre-computed prompt hash comparison.
+ 
+ ## NOT_RUN
+-- Real `schtasks`/registry operations inside tests (argv-level checks only).
+-- No test installs into the real ~/.claude or ~/.codex.
+-- PM Bridge real `review.js` is never called by tests (fake script used).
+-- Mutation checks: not run by operator policy.
++See the not_run list in verify-evidence.json (real PM Bridge dump mode, real schtasks/registry, installs into real homes, phase-8 push through the pre-push hook with a genuine approval, mutation checks).
+ 
+ ## Known gaps
+-- Approval files are guarded by tooling, not cryptography.
+-- Installed files are LF while deploy/ files are CRLF on Windows (cosmetic).
+-- Imported agents and skills (36 + 8) are copied unchanged from the operator's agents-skills-repo; they are not reviewed here beyond deploy-format validity.
+-
+-## Reviewer consensus
+-No separate specialist reviewer round was run for this repository; the independent evidence is the test agent's findings above.
++- Approval files are guarded by tooling and digests, not cryptography.
++- Text-based push detection is best effort; the git pre-push hook is the boundary.
++- `status` does not yet print the exact artifact requirements (backlog item 1).
+diff --git a/tests/afhelpers.py b/tests/afhelpers.py
+index 38cad45..6cdfe9d 100644
+--- a/tests/afhelpers.py
++++ b/tests/afhelpers.py
+@@ -76,20 +76,61 @@ def run_cli(repo: Path, *args: str, stdin: str | None = None, env: dict | None =
+                           capture_output=True, text=True, env=e, timeout=60)
+ 
+ 
+-def set_state(repo: Path, phase: int = 1, mode: str = "hard", paused: bool = False, title: str = "T") -> None:
+-    core.write_state(repo, {"title": title, "phase": phase, "mode": mode, "paused": paused, "history": []})
++TEST_SID = "abc123def456"
++
++
++def set_state(repo: Path, phase: int = 1, mode: str = "hard", paused: bool = False, title: str = "T",
++              sid: str | None = TEST_SID) -> None:
++    """Write a sprint state. `sid=None` writes a LEGACY state (no sprint_id)."""
++    st = {"title": title, "phase": phase, "mode": mode, "paused": paused, "history": []}
++    if sid:
++        st["sprint_id"] = sid
++    core.write_state(repo, st)
+ 
+ 
+ def sdlc(repo: Path) -> Path:
+     return repo / "docs" / "sdlc"
+ 
+ 
+-def write_artifact(repo: Path, rel: str, text: str = "x\n") -> None:
++def sprint_id(repo: Path) -> str | None:
++    st = core.read_state(repo)
++    return (st or {}).get("sprint_id")
++
++
++def write_artifact(repo: Path, rel: str, text: str = "x" + chr(10), stamp: bool | str = True) -> None:
++    """Write a phase artifact; by default it is stamped with the current sprint id (`stamp=False` or a custom id)."""
+     f = sdlc(repo) / rel
+     f.parent.mkdir(parents=True, exist_ok=True)
++    sid = stamp if isinstance(stamp, str) else (sprint_id(repo) if stamp else None)
++    if sid:
++        text = text + chr(10) + "Sprint: " + sid + chr(10)
+     f.write_text(text, encoding="utf-8")
+ 
+ 
++PHASE_1_7 = ["requirements.md", "backlog.md", "design.md", "test-plan.md", "review-record.md",
++             "change-records/c1.md", "verify-evidence.md"]
++
++
++def stamp_phases_1_7(repo: Path) -> None:
++    for rel in PHASE_1_7:
++        write_artifact(repo, rel)
++
++
++def write_evidence(repo: Path, tested_head: str | None = None, **over) -> dict:
++    """Write a compliant verify-evidence.json (tested_head defaults to the repo HEAD)."""
++    d = {"tested_head": tested_head or core.head(repo),
++         "runs": [{"command": "python -m unittest discover -s tests", "total": 10, "passed": 9, "failed": 0,
++                   "errors": 0, "skipped": 1}],
++         "not_run": [{"item": "real schtasks", "reason": "needs admin"}],
++         "findings": {"open_blocker": 0, "open_major": 0},
++         "reviewers": [{"role": "code-reviewer", "model": "sonnet", "effort": "medium", "verdict": "APPROVE"}]}
++    d.update(over)
++    f = sdlc(repo) / "verify-evidence.json"
++    f.parent.mkdir(parents=True, exist_ok=True)
++    f.write_text(json.dumps(d, indent=2), encoding="utf-8")
++    return d
++
++
+ def write_approval(repo: Path, kind: str = "code", head: str | None = None, verdict: str = "APPROVE",
+                    request_id: str | None = "q1", reply_id: str | None = "r1",
+                    md: str | None = "default") -> str:
+@@ -103,6 +144,8 @@ def write_approval(repo: Path, kind: str = "code", head: str | None = None, verd
+     (pm / jname).write_text(json.dumps(a), encoding="utf-8")
+     if md is not None:
+         text = f"Head: {h}\n" if md == "default" else md
++        if sprint_id(repo) and md == "default":
++            text += "Sprint: " + sprint_id(repo) + "\n"
+         (sdlc(repo) / mname).write_text(text, encoding="utf-8")
+     return h
+ 
+@@ -110,12 +153,40 @@ def write_approval(repo: Path, kind: str = "code", head: str | None = None, verd
+ FAKE_REVIEW_JS = r"""
+ const fs = require('fs'); const cp = require('child_process');
+ const cfg = JSON.parse(fs.readFileSync(process.env.FAKE_CFG, 'utf8'));
++const crypto = require('crypto');
+ const argv = process.argv.slice(2);
++const arg = (n) => { const k = argv.indexOf(n); return k >= 0 ? argv[k + 1] : null; };
++const dumpFile = process.env.PM_BRIDGE_DEBUG_DUMP_PROMPT;
++const dumpOnly = process.env.PM_BRIDGE_DEBUG_DUMP_PROMPT_ONLY === '1';
++const mode = cfg.dump_mode || 'ok';   // ok | empty (dump-only writes nothing) | ignored (env not honoured) | wrong (prompt lacks packet/head)
++const log = (what) => { if (cfg.calls_out) fs.appendFileSync(cfg.calls_out, what + '\n'); };
++function buildPrompt() {
++  const cwd = arg('--cwd'), base = arg('--base');
++  const raw = !!cfg.raw_bytes;   // raw_bytes: no newline normalisation (exact bytes), optionally CRLF injected into the diff
++  let packet = fs.readFileSync(arg('--scope-note-file'), 'utf8');
++  const head = cp.execSync('git -C "' + cwd + '" rev-parse HEAD').toString().trim();
++  let diff = cp.execSync('git -C "' + cwd + '" diff ' + base + '...' + head).toString();
++  if (!raw) { packet = packet.replace(/\r\n/g, '\n'); diff = diff.replace(/\r\n/g, '\n'); }
++  if (cfg.inject_crlf) diff = diff.replace(/\r?\n/g, '\r\n');
++  if (mode === 'wrong') return 'REVIEW PROMPT without the packet\n';
++  return 'REVIEW PROMPT\n' + packet + '\nHead: ' + head + '\nDiff:\n```diff\n' + diff + '\n```\n';
++}
++if (dumpFile && dumpOnly && mode !== 'ignored') {
++  log('dump');
++  fs.writeFileSync(cfg.argv_out, JSON.stringify(argv));
++  if (mode !== 'empty') fs.writeFileSync(dumpFile, buildPrompt());
++  process.exit(0);
++}
++log('real');
+ fs.writeFileSync(cfg.argv_out, JSON.stringify(argv));
+ const i = argv.indexOf('--scope-note-file');
+ if (i >= 0) fs.copyFileSync(argv[i + 1], cfg.packet_out);
+ if (cfg.commit_in) cp.execSync('git -C "' + cfg.commit_in + '" -c user.name=t -c user.email=t@t commit --allow-empty -q -m moved');
+ if (cfg.raw !== undefined) { process.stdout.write(cfg.raw); process.exit(cfg.exit || 0); }
++const result = Object.assign({}, cfg.result);
++if (!cfg.keep_hash && mode !== 'ignored') {
++  result.reviewInputHash = cfg.bad_hash || crypto.createHash('sha256').update(buildPrompt(), 'utf8').digest('hex');
++}
+ console.log('some log noise before the json line');
+-console.log(JSON.stringify(cfg.result));
++console.log(JSON.stringify(result));
+ """
+diff --git a/tests/test_af_install.py b/tests/test_af_install.py
+index 08e4ccc..fce23b6 100644
+--- a/tests/test_af_install.py
++++ b/tests/test_af_install.py
+@@ -70,7 +70,7 @@ class FirstInstall(InstallBase):
+             self.assertTrue((self.cx / "skills" / s / "SKILL.md").is_file(), s)
+         self.assertTrue((self.ch / "skills" / "af" / "SKILL.md").is_file())
+         self.assertTrue((self.cx / "prompts" / "af.md").is_file())
+-        self.assertIn("$ARGUMENTS", (self.cx / "prompts" / "af.md").read_text(encoding="utf-8"))
++        self.assertNotIn("$ARGUMENTS", (self.cx / "prompts" / "af.md").read_text(encoding="utf-8"))  # Codex appends typed args itself
+         self.assertTrue((self.ch / "af-install-manifest.json").is_file())
+         self.assertTrue((self.cx / "af-install-manifest.json").is_file())
+ 
+diff --git a/tests/test_deploy_imported.py b/tests/test_deploy_imported.py
+index 52ef556..59c336f 100644
+--- a/tests/test_deploy_imported.py
++++ b/tests/test_deploy_imported.py
+@@ -166,10 +166,11 @@ class SkillsAndCommand(unittest.TestCase):
+         self.assertNotIn("af", SKILLS)
+         self.assertFalse((DEPLOY / "codex" / "skills" / "af").exists())
+ 
+-    def test_codex_prompt_has_arguments_placeholder(self):
++    def test_codex_prompt_has_no_arguments_placeholder(self):
+         f = DEPLOY / "codex" / "prompts" / "af.md"
+         text = f.read_text(encoding="utf-8")
+-        self.assertIn("$ARGUMENTS", text)
++        self.assertNotIn("$ARGUMENTS", text)  # Codex appends the typed arguments itself
++        self.assertNotIn("Arguments: $", text)
+         m = re.match(r"\A---\n(.*?)\n---\n", text, re.S)
+         self.assertTrue(m)
+         self.assertIn("description:", m.group(1))
+diff --git a/tests/test_hook_githook.py b/tests/test_hook_githook.py
+index b8f8c58..3c8ec3d 100644
+--- a/tests/test_hook_githook.py
++++ b/tests/test_hook_githook.py
+@@ -172,7 +172,9 @@ class HookMain(unittest.TestCase):
+                 out = json.loads(r.stdout)["hookSpecificOutput"]
+                 self.assertEqual(out["hookEventName"], name)
+                 ctx = out["additionalContext"]
+-                self.assertIn("sprint 'Alpha' phase 1 Discovery", ctx)
++                self.assertIn("sprint 'Alpha'", ctx)
++                self.assertIn("phase 1 Discovery", ctx)
++                self.assertIn("id " + H.TEST_SID, ctx)
+                 self.assertIn("Missing exit artifacts: requirements.md", ctx)
+                 self.assertIn("business-analyst", ctx)
+ 
+diff --git a/tests/test_nongit.py b/tests/test_nongit.py
+new file mode 100644
+index 0000000..a5b86fe
+--- /dev/null
++++ b/tests/test_nongit.py
+@@ -0,0 +1,45 @@
++"""af_cli run outside a git repository: friendly error, non-zero exit, no traceback, no state written."""
++import unittest
++
++import afhelpers as H
++
++
++class NotAGitRepo(unittest.TestCase):
++    def setUp(self):
++        self.d = H.tmpdir(self)  # plain temp dir, no git
++
++    def check(self, r):
++        self.assertNotEqual(r.returncode, 0, r.stdout + r.stderr)
++        self.assertIn("Not inside a git repository", r.stderr)
++        self.assertIn("--project", r.stderr)
++        self.assertNotIn("Traceback", r.stderr)
++        self.assertNotIn("RuntimeError", r.stderr)
++        self.assertFalse((self.d / "docs").exists(), "no state may be written outside a repo")
++
++    def test_status_and_on_and_friends_from_cwd(self):
++        for args in (("status",), ("on",), ("on", "--mode", "soft"), ("off",), ("start", "T"), ("next",),
++                     ("migrate",), ("verify",), ("install-githook",), ("pause",), ("mode", "hard")):
++            with self.subTest(cmd=args):
++                self.check(H.run_cli(self.d, *args))
++
++    def test_project_flag_pointing_to_non_git_dir(self):
++        other = H.tmpdir(self)
++        repo = H.make_repo(self)
++        r = H.run_cli(repo, "--project", str(other), "status")
++        self.assertNotEqual(r.returncode, 0)
++        self.assertIn("Not inside a git repository", r.stderr)
++        self.assertNotIn("Traceback", r.stderr)
++        self.assertFalse((other / "docs").exists())
++
++    def test_project_flag_to_missing_path_is_friendly_or_clean(self):
++        r = H.run_cli(self.d, "--project", str(self.d / "does-not-exist"), "status")
++        self.assertNotEqual(r.returncode, 0)
++        self.assertNotIn("Traceback", r.stderr)
++
++    def test_inside_repo_still_works(self):
++        repo = H.make_repo(self)
++        self.assertEqual(H.run_cli(repo, "status").returncode, 0)
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tests/test_pm_review.py b/tests/test_pm_review.py
+index 8a94d9f..d568dbf 100644
+--- a/tests/test_pm_review.py
++++ b/tests/test_pm_review.py
+@@ -97,16 +97,14 @@ class Verify(unittest.TestCase):
+         self.assertTrue(r.stdout.startswith("OK"))
+ 
+ 
+-GOOD_EVIDENCE = chr(10).join(["# Evidence", "", "## Test evidence", "all green", "", "## NOT_RUN", "nothing", ""])
+-
+-
+ @unittest.skipUnless(NODE, "NOT_RUN: node is not available; fake review.js cannot be executed")
+ class Request(unittest.TestCase):
+     def setUp(self):
+         self.repo = H.make_repo(self)
+         H.commit_file(self.repo, "a.txt")
+         H.set_state(self.repo, phase=8)
+-        H.write_artifact(self.repo, "verify-evidence.md", GOOD_EVIDENCE)
++        H.stamp_phases_1_7(self.repo)
++        H.write_evidence(self.repo)
+         self.base = H.first_commit(self.repo)
+         self.tools = H.tmpdir(self)
+         (self.tools / "review.js").write_text(H.FAKE_REVIEW_JS, encoding="utf-8")
+@@ -141,7 +139,7 @@ class Request(unittest.TestCase):
+         self.assertEqual(a["head"], head)
+         self.assertEqual(a["base"], self.base)
+         self.assertEqual(a["verdict"], "APPROVE")
+-        self.assertEqual((a["request_id"], a["reply_id"], a["input_hash"]), ("req-1", "reply-1", "hash-1"))
++        self.assertEqual((a["request_id"], a["reply_id"], a["input_hash"]), ("req-1", "reply-1", a["expected_input_hash"]))
+         self.assertEqual(a["reply_sha256"], hashlib.sha256(APPROVE["reply"].encode()).hexdigest())
+         self.assertIn(head, m.read_text(encoding="utf-8"))
+         ok, why = pm_review.verify(self.repo)
+@@ -151,7 +149,7 @@ class Request(unittest.TestCase):
+         self.assertFalse(pm_review.verify(self.repo)[0])
+ 
+     def test_request_passes_exact_range_and_packet_to_review_js(self):
+-        H.write_artifact(self.repo, "verify-evidence.md", GOOD_EVIDENCE + "EVIDENCE-MARKER")
++        H.write_evidence(self.repo, not_run=[{"item": "EVIDENCE-MARKER", "reason": "r"}])
+         rc, out = self.run_request()
+         self.assertEqual(rc, 0, out)
+         argv = json.loads((self.tools / "argv.json").read_text(encoding="utf-8"))
+@@ -163,7 +161,7 @@ class Request(unittest.TestCase):
+         self.assertIn("EVIDENCE-MARKER", packet)
+ 
+     def test_missing_verify_evidence_is_refused_for_code(self):
+-        (H.sdlc(self.repo) / "verify-evidence.md").unlink()
++        (H.sdlc(self.repo) / "verify-evidence.json").unlink()
+         rc, out = self.run_request()
+         self.assertEqual(rc, 2)
+         self.assertIn("REFUSED", out)
+@@ -209,7 +207,8 @@ class Request(unittest.TestCase):
+                 repo = H.make_repo(self)
+                 H.commit_file(repo, "a.txt")
+                 H.set_state(repo, phase=8)
+-                H.write_artifact(repo, "verify-evidence.md", GOOD_EVIDENCE)
++                H.stamp_phases_1_7(repo)
++                H.write_evidence(repo)
+                 result = copy.deepcopy(APPROVE)
+                 result.update(patch)
+                 rc, out = self.run_request(result, repo=repo)
+@@ -223,6 +222,7 @@ class Request(unittest.TestCase):
+     def test_rejection_does_not_clobber_existing_valid_approval_for_other_head(self):
+         self.run_request()
+         H.commit_file(self.repo, "c.txt")
++        H.write_evidence(self.repo)
+         bad = dict(APPROVE, verdict="MINOR")
+         rc, _ = self.run_request(bad)
+         self.assertEqual(rc, 1)
+@@ -287,6 +287,7 @@ class Request(unittest.TestCase):
+         cfg["result"] = dict(APPROVE, verdict="MAJOR")
+         (self.tools / "cfg.json").write_text(json.dumps(cfg), encoding="utf-8")
+         H.commit_file(self.repo, "z.txt")
++        H.write_evidence(self.repo)
+         r = H.run_cli(self.repo, "pm-review", "--base", self.base, env=env)
+         self.assertEqual(r.returncode, 1)
+ 
+diff --git a/tests/test_round4.py b/tests/test_round4.py
+index 05a96c5..9893524 100644
+--- a/tests/test_round4.py
++++ b/tests/test_round4.py
+@@ -13,7 +13,6 @@ import afhelpers as H
+ from afhelpers import ROOT, core, deploy, pm_review, APPROVE
+ 
+ NODE = shutil.which("node")
+-GOOD = chr(10).join(["# Evidence", "", "## Test evidence", "all green", "", "## NOT_RUN", "nothing", ""])
+ PAST = 1_000_000_000  # 2001: well before any sprint start
+ 
+ 
+@@ -63,24 +62,6 @@ class StaleArtifacts(unittest.TestCase):
+         self.assertEqual(state(self.repo)["phase"], 2)
+         self.assertTrue(state(self.repo)["history"][-1]["forced"])
+ 
+-    def test_glob_artifact_staleness_phase_6(self):
+-        H.set_state(self.repo, phase=6)
+-        st = state(self.repo)
+-        st["started_epoch"] = 2_000_000_000.0  # far future start: anything on disk is older
+-        core.write_state(self.repo, st)
+-        H.write_artifact(self.repo, "change-records/c1.md")
+-        self.assertEqual(core.missing_artifacts(self.repo, 6), ["change-records/*.md"])
+-        st["started_epoch"] = PAST
+-        core.write_state(self.repo, st)
+-        self.assertEqual(core.missing_artifacts(self.repo, 6), [])
+-
+-    def test_legacy_state_without_started_epoch_keeps_old_behaviour(self):
+-        H.write_artifact(self.repo, "requirements.md")
+-        age(H.sdlc(self.repo) / "requirements.md")
+-        H.set_state(self.repo, phase=1)  # helper writes a state without started_epoch
+-        self.assertNotIn("started_epoch", state(self.repo))
+-        self.assertEqual(core.missing_artifacts(self.repo, 1), [])
+-
+     def test_no_state_means_no_staleness_filter(self):
+         H.write_artifact(self.repo, "requirements.md")
+         age(H.sdlc(self.repo) / "requirements.md")
+@@ -165,7 +146,8 @@ class Preflight(unittest.TestCase):
+         self.first = H.first_commit(self.repo)
+         H.commit_file(self.repo, "a.txt")
+         H.set_state(self.repo, phase=8)
+-        H.write_artifact(self.repo, "verify-evidence.md", GOOD)
++        H.stamp_phases_1_7(self.repo)
++        H.write_evidence(self.repo)
+         self.tools = H.tmpdir(self)
+         (self.tools / "review.js").write_text(H.FAKE_REVIEW_JS, encoding="utf-8")
+         self.argv = self.tools / "argv.json"
+@@ -193,21 +175,21 @@ class Preflight(unittest.TestCase):
+         self.assertEqual(rc, 0, out)
+ 
+     def test_evidence_file_missing(self):
+-        (H.sdlc(self.repo) / "verify-evidence.md").unlink()
+-        self.assert_refused(*self.request(), "verify-evidence.md")
++        (H.sdlc(self.repo) / "verify-evidence.json").unlink()
++        self.assert_refused(*self.request(), "verify-evidence.json")
+ 
+-    def test_evidence_lacks_each_required_heading(self):
+-        for drop in ("## Test evidence", "## NOT_RUN"):
+-            with self.subTest(missing=drop):
+-                H.write_artifact(self.repo, "verify-evidence.md", GOOD.replace(drop, "## Other"))
+-                self.assert_refused(*self.request(), drop)
++    def test_evidence_invalid_sections(self):
++        for label, over in (("no_runs", {"runs": []}), ("open_major", {"findings": {"open_blocker": 0, "open_major": 1}})):
++            with self.subTest(case=label):
++                H.write_evidence(self.repo, **over)
++                self.assert_refused(*self.request(), "not acceptable")
+ 
+-    def test_evidence_empty(self):
+-        H.write_artifact(self.repo, "verify-evidence.md", "")
++    def test_evidence_empty_file(self):
++        (H.sdlc(self.repo) / "verify-evidence.json").write_text("", encoding="utf-8")
+         self.assert_refused(*self.request())
+ 
+     def test_docs_kind_does_not_need_evidence(self):
+-        (H.sdlc(self.repo) / "verify-evidence.md").unlink()
++        (H.sdlc(self.repo) / "verify-evidence.json").unlink()
+         rc, out = self.request(kind="docs")
+         self.assertEqual(rc, 0, out)
+ 
+@@ -224,6 +206,7 @@ class Preflight(unittest.TestCase):
+         start = core.head(self.repo)
+         mid = H.commit_file(self.repo, "mid.txt")
+         H.commit_file(self.repo, "late.txt")
++        H.write_evidence(self.repo)
+         st = state(self.repo)
+         st["start_head"] = start
+         core.write_state(self.repo, st)
+@@ -232,6 +215,7 @@ class Preflight(unittest.TestCase):
+     def test_base_at_or_before_start_head_is_accepted(self):
+         start = core.head(self.repo)
+         H.commit_file(self.repo, "work.txt")
++        H.write_evidence(self.repo)
+         st = state(self.repo)
+         st["start_head"] = start
+         core.write_state(self.repo, st)
+@@ -261,7 +245,7 @@ class Preflight(unittest.TestCase):
+         self.assertEqual(a["base_sha"], self.first)
+         diff = H.git(self.repo, "diff", f"{self.first}...{head}")
+         self.assertEqual(a["diff_sha256"], hashlib.sha256(diff.encode("utf-8")).hexdigest())
+-        ev = (H.sdlc(self.repo) / "verify-evidence.md").read_bytes()
++        ev = (H.sdlc(self.repo) / "verify-evidence.json").read_bytes()
+         self.assertEqual(a["evidence_sha256"], hashlib.sha256(ev).hexdigest())
+         self.assertTrue(pm_review.verify(self.repo)[0])
+ 
+@@ -270,7 +254,7 @@ class Preflight(unittest.TestCase):
+         p = H.sdlc(self.repo) / ".pm-review" / "approval.json"
+         a1 = json.loads(p.read_text(encoding="utf-8"))
+         H.commit_file(self.repo, "more.txt")
+-        H.write_artifact(self.repo, "verify-evidence.md", GOOD + "extra line" + chr(10))
++        H.write_evidence(self.repo, not_run=[{"item": "extra", "reason": "r"}])
+         self.request()
+         a2 = json.loads(p.read_text(encoding="utf-8"))
+         self.assertNotEqual(a1["diff_sha256"], a2["diff_sha256"])
+@@ -278,7 +262,7 @@ class Preflight(unittest.TestCase):
+         self.assertEqual(a1["base_sha"], a2["base_sha"])
+ 
+     def test_cli_refuses_with_exit_2_without_evidence(self):
+-        (H.sdlc(self.repo) / "verify-evidence.md").unlink()
++        (H.sdlc(self.repo) / "verify-evidence.json").unlink()
+         cfg = {"result": APPROVE, "argv_out": str(self.argv), "packet_out": str(self.tools / "packet.md")}
+         (self.tools / "cfg.json").write_text(json.dumps(cfg), encoding="utf-8")
+         r = H.run_cli(self.repo, "pm-review", "--kind", "code", "--base", self.first,
+diff --git a/tests/test_round5.py b/tests/test_round5.py
+new file mode 100644
+index 0000000..525f348
+--- /dev/null
++++ b/tests/test_round5.py
+@@ -0,0 +1,679 @@
++"""Round-5: structured evidence, sprint-id stamping, migrate, prompt pre-computation and artifact digests."""
++import contextlib
++import hashlib
++import io
++import json
++import os
++import shutil
++import unittest
++from unittest import mock
++
++import afhelpers as H
++from afhelpers import ROOT, APPROVE, core, pm_review
++
++sys_path_done = H.TOOLS  # tools/ is already on sys.path via afhelpers
++from af import evidence  # noqa: E402
++
++NODE = shutil.which("node")
++NL = chr(10)
++
++
++def sha(b: bytes) -> str:
++    return hashlib.sha256(b).hexdigest()
++
++
++def state(repo):
++    return core.read_state(repo)
++
++
++# ---------------------------------------------------------------- evidence.validate
++class EvidenceValidate(unittest.TestCase):
++    def setUp(self):
++        self.repo = H.make_repo(self)
++        H.commit_file(self.repo, "a.py", "x = 1" + NL)
++        self.head = core.head(self.repo)
++        H.write_evidence(self.repo)
++
++    def problems(self):
++        return evidence.validate(self.repo, core.head(self.repo))
++
++    def assert_rejects(self, needle):
++        p = self.problems()
++        self.assertTrue(p, "expected a rejection")
++        self.assertTrue(any(needle in x for x in p), p)
++
++    def ev(self, **over):
++        return H.write_evidence(self.repo, **over)
++
++    def test_valid_evidence_has_no_problems(self):
++        self.assertEqual(self.problems(), [])
++
++    def test_missing_file(self):
++        (H.sdlc(self.repo) / "verify-evidence.json").unlink()
++        self.assert_rejects("missing")
++
++    def test_invalid_json(self):
++        (H.sdlc(self.repo) / "verify-evidence.json").write_text("{not json", encoding="utf-8")
++        self.assert_rejects("not valid JSON")
++
++    def test_json_not_an_object(self):
++        (H.sdlc(self.repo) / "verify-evidence.json").write_text("[1, 2]", encoding="utf-8")
++        self.assert_rejects("JSON object")
++
++    def test_tested_head_missing_or_short(self):
++        for v in (None, "", "abc", 12345):
++            with self.subTest(v=v):
++                self.ev(tested_head="x")  # write then overwrite below
++                d = json.loads((H.sdlc(self.repo) / "verify-evidence.json").read_text(encoding="utf-8"))
++                d["tested_head"] = v
++                (H.sdlc(self.repo) / "verify-evidence.json").write_text(json.dumps(d), encoding="utf-8")
++                self.assert_rejects("tested_head")
++
++    def test_tested_head_unknown_commit(self):
++        self.ev(tested_head="0123456789abcdef0123456789abcdef01234567")
++        self.assert_rejects("not an ancestor commit")
++
++    def test_tested_head_not_an_ancestor(self):
++        H.git(self.repo, "checkout", "-q", "-b", "side", H.first_commit(self.repo))
++        side = H.commit_file(self.repo, "side.txt")
++        H.git(self.repo, "checkout", "-q", "-")
++        self.ev(tested_head=side)
++        self.assert_rejects("not an ancestor commit")
++
++    def test_code_changed_after_tested_head_is_rejected(self):
++        self.ev(tested_head=self.head)
++        H.commit_file(self.repo, "b.py", "y = 2" + NL)
++        self.assert_rejects("code changed after the tested head")
++        self.assertIn("b.py", " ".join(self.problems()))
++
++    def test_docs_only_change_after_tested_head_is_allowed(self):
++        self.ev(tested_head=self.head)
++        H.commit_file(self.repo, "docs/guide.md", "doc" + NL)
++        self.assertEqual(self.problems(), [])
++
++    def test_allowed_core_logs_after_tested_head(self):
++        self.ev(tested_head=self.head)
++        for name in ("core/DECISION_LOG.md", "core/LESSONS_LOG.md", "core/BACKLOG.md"):
++            (self.repo / "core").mkdir(exist_ok=True)
++            H.commit_file(self.repo, name, name + NL)
++        self.assertEqual(self.problems(), [])
++
++    def test_other_core_file_after_tested_head_is_code(self):
++        self.ev(tested_head=self.head)
++        (self.repo / "core").mkdir(exist_ok=True)
++        H.commit_file(self.repo, "core/agents.md", "x" + NL)
++        self.assert_rejects("code changed")
++
++    def test_mixed_docs_and_code_change_rejected(self):
++        self.ev(tested_head=self.head)
++        H.commit_file(self.repo, "docs/g.md", "d" + NL)
++        H.commit_file(self.repo, "c.py", "z" + NL)
++        self.assert_rejects("c.py")
++
++    def test_runs_empty_or_not_a_list(self):
++        for v in ([], None, "x", {}):
++            with self.subTest(v=v):
++                self.ev(runs=v)
++                self.assert_rejects("runs must be a non-empty list")
++
++    def run_with(self, **kw):
++        r = {"command": "pytest", "total": 4, "passed": 4, "failed": 0, "errors": 0, "skipped": 0}
++        r.update(kw)
++        self.ev(runs=[r])
++
++    def test_run_command_missing_or_blank(self):
++        for v in (None, "", "   ", 5):
++            with self.subTest(v=v):
++                self.run_with(command=v)
++                self.assert_rejects("command is missing")
++
++    def test_non_integer_or_negative_counts(self):
++        for key in ("total", "passed", "failed", "errors", "skipped"):
++            for bad in ("3", 3.0, True, None, -1):
++                with self.subTest(key=key, bad=bad):
++                    self.run_with(**{key: bad})
++                    self.assert_rejects("integer")
++
++    def test_missing_count_key(self):
++        self.ev(runs=[{"command": "x", "total": 1, "passed": 1}])
++        self.assert_rejects("integer")
++
++    def test_contradictory_counts(self):
++        self.run_with(total=10, passed=4)
++        self.assert_rejects("contradictory")
++        self.run_with(total=3, passed=4)
++        self.assert_rejects("contradictory")
++
++    def test_zero_tests(self):
++        self.run_with(total=0, passed=0)
++        self.assert_rejects("zero tests")
++
++    def test_failed_or_errors_are_red(self):
++        self.run_with(total=4, passed=3, failed=1)
++        self.assert_rejects("is red")
++        self.run_with(total=4, passed=3, errors=1)
++        self.assert_rejects("is red")
++
++    def test_skipped_alone_is_allowed(self):
++        self.run_with(total=4, passed=3, skipped=1)
++        self.assertEqual(self.problems(), [])
++
++    def test_optional_log_accepted(self):
++        self.run_with(log="D:/logs/run.txt")
++        self.assertEqual(self.problems(), [])
++
++    def test_one_red_run_among_green_rejects(self):
++        good = {"command": "a", "total": 1, "passed": 1, "failed": 0, "errors": 0, "skipped": 0}
++        bad = dict(good, command="b", passed=0, failed=1)
++        self.ev(runs=[good, bad])
++        self.assert_rejects("runs[1] is red")
++
++    def test_not_run_entries_need_item_and_reason(self):
++        for entry in ({"item": "x"}, {"reason": "y"}, {"item": " ", "reason": "y"}, {"item": "x", "reason": ""}, "str"):
++            with self.subTest(entry=entry):
++                self.ev(not_run=[entry])
++                self.assert_rejects("needs item and reason")
++
++    def test_not_run_must_be_list_but_may_be_empty(self):
++        self.ev(not_run="none")
++        self.assert_rejects("not_run must be a list")
++        self.ev(not_run=[])
++        self.assertEqual(self.problems(), [])
++
++    def test_open_blocker_or_major_rejected(self):
++        self.ev(findings={"open_blocker": 1, "open_major": 0})
++        self.assert_rejects("open blocking findings")
++        self.ev(findings={"open_blocker": 0, "open_major": 2})
++        self.assert_rejects("open blocking findings")
++
++    def test_findings_malformed(self):
++        for v in (None, {}, {"open_blocker": 0}, {"open_blocker": "0", "open_major": 0}, {"open_blocker": 0, "open_major": -1}):
++            with self.subTest(v=v):
++                self.ev(findings=v)
++                self.assert_rejects("findings needs integer")
++
++    def test_reviewers_malformed(self):
++        good = {"role": "r", "model": "m", "effort": "e", "verdict": "APPROVE"}
++        for v in ("x", [{"role": "r"}], [dict(good, verdict="")], [5]):
++            with self.subTest(v=v):
++                self.ev(reviewers=v)
++                self.assertTrue(self.problems())
++        self.ev(reviewers=[])
++        self.assertEqual(self.problems(), [])
++
++    def test_reviewer_field_null_is_rejected(self):
++        good = {"role": "r", "model": "m", "effort": "e", "verdict": "APPROVE"}
++        for k in ("role", "model", "effort", "verdict"):
++            with self.subTest(field=k):
++                self.ev(reviewers=[dict(good, **{k: None})])
++                self.assertTrue(self.problems(), f"reviewers[0].{k}=null must be rejected")
++
++    def test_not_run_null_item_or_reason_is_rejected(self):
++        for entry in ({"item": None, "reason": "r"}, {"item": "i", "reason": None}):
++            with self.subTest(entry=entry):
++                self.ev(not_run=[entry])
++                self.assertTrue(self.problems(), f"{entry} must be rejected")
++
++    def test_all_problems_reported_together(self):
++        self.ev(runs=[], findings={"open_blocker": 1, "open_major": 0}, not_run=[{}])
++        self.assertGreaterEqual(len(self.problems()), 3)
++
++
++# ---------------------------------------------------------------- sprint id / migrate / digests
++class SprintId(unittest.TestCase):
++    def setUp(self):
++        self.repo = H.make_repo(self)
++
++    def test_start_and_on_assign_distinct_hex_sprint_ids(self):
++        ids = []
++        for cmd in (("start", "S"), ("on",)):
++            repo = H.make_repo(self)
++            self.assertEqual(H.run_cli(repo, *cmd).returncode, 0)
++            sid = state(repo)["sprint_id"]
++            self.assertRegex(sid, r"^[0-9a-f]{12}$")
++            ids.append(sid)
++        self.assertNotEqual(*ids)
++
++    def test_artifact_without_sprint_id_is_missing_and_stamped_accepted(self):
++        H.run_cli(self.repo, "start", "S")
++        H.write_artifact(self.repo, "requirements.md", "no id here" + NL, stamp=False)
++        self.assertEqual(core.missing_artifacts(self.repo, 1), ["requirements.md"])
++        r = H.run_cli(self.repo, "next")
++        self.assertEqual(r.returncode, 1)
++        self.assertIn("requirements.md", r.stdout)
++        H.write_artifact(self.repo, "requirements.md", "now stamped" + NL)  # helper stamps current id
++        self.assertEqual(core.missing_artifacts(self.repo, 1), [])
++        self.assertEqual(H.run_cli(self.repo, "next").returncode, 0)
++        self.assertEqual(state(self.repo)["phase"], 2)
++
++    def test_stale_artifact_from_previous_sprint_rejected(self):
++        H.run_cli(self.repo, "start", "S")
++        H.write_artifact(self.repo, "requirements.md", "old sprint" + NL, stamp="000000000000")
++        self.assertEqual(core.missing_artifacts(self.repo, 1), ["requirements.md"])
++        self.assertEqual(H.run_cli(self.repo, "next").returncode, 1)
++
++    def test_old_mtime_does_not_matter_only_the_id(self):
++        H.run_cli(self.repo, "start", "S")
++        H.write_artifact(self.repo, "requirements.md")
++        p = H.sdlc(self.repo) / "requirements.md"
++        os.utime(p, (1_000_000_000, 1_000_000_000))
++        self.assertEqual(core.missing_artifacts(self.repo, 1), [])
++
++    def test_sprint_id_embedded_in_longer_text_counts(self):
++        H.set_state(self.repo, phase=1)
++        H.write_artifact(self.repo, "requirements.md", "intro" + NL + "Sprint: " + H.TEST_SID + NL + "more", stamp=False)
++        self.assertEqual(core.missing_artifacts(self.repo, 1), [])
++
++    def test_glob_artifact_requires_stamp(self):
++        H.set_state(self.repo, phase=6)
++        H.write_artifact(self.repo, "change-records/c1.md", "x", stamp=False)
++        self.assertEqual(core.missing_artifacts(self.repo, 6), ["change-records/*.md"])
++        H.write_artifact(self.repo, "change-records/c2.md", "x")
++        self.assertEqual(core.missing_artifacts(self.repo, 6), [])
++
++    def test_status_and_hook_context_show_sprint_id(self):
++        H.run_cli(self.repo, "start", "S")
++        sid = state(self.repo)["sprint_id"]
++        self.assertIn(sid, H.run_cli(self.repo, "status").stdout)
++        from af import hook
++        self.assertIn(sid, hook.context_line(self.repo))
++
++    def test_resume_keeps_sprint_id(self):
++        H.run_cli(self.repo, "on")
++        sid = state(self.repo)["sprint_id"]
++        H.run_cli(self.repo, "off")
++        H.run_cli(self.repo, "on")
++        self.assertEqual(state(self.repo)["sprint_id"], sid)
++
++
++class Legacy(unittest.TestCase):
++    def setUp(self):
++        self.repo = H.make_repo(self)
++        H.set_state(self.repo, phase=1, sid=None)
++        H.write_artifact(self.repo, "requirements.md", "legacy artifact" + NL)
++
++    def test_next_blocked_with_migrate_hint(self):
++        self.assertNotIn("sprint_id", state(self.repo))
++        r = H.run_cli(self.repo, "next")
++        self.assertEqual(r.returncode, 1)
++        self.assertIn("BLOCKED", r.stdout)
++        self.assertIn("migrate", r.stdout)
++        self.assertEqual(state(self.repo)["phase"], 1)
++
++    def test_force_does_not_bypass_legacy_block(self):
++        self.assertEqual(H.run_cli(self.repo, "next", "--force").returncode, 1)
++        self.assertEqual(state(self.repo)["phase"], 1)
++
++    def test_legacy_status_hints_migrate(self):
++        self.assertIn("migrate", H.run_cli(self.repo, "status").stdout)
++
++    def test_migrate_assigns_id_and_is_idempotent(self):
++        r = H.run_cli(self.repo, "migrate")
++        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
++        sid = state(self.repo)["sprint_id"]
++        self.assertRegex(sid, r"^[0-9a-f]{12}$")
++        self.assertIn(sid, r.stdout)
++        keep = {k: v for k, v in state(self.repo).items() if k != "updated"}
++        r2 = H.run_cli(self.repo, "migrate")
++        self.assertEqual(r2.returncode, 0)
++        self.assertIn("Already migrated", r2.stdout)
++        self.assertEqual({k: v for k, v in state(self.repo).items() if k != "updated"}, keep)
++
++    def test_after_migrate_unstamped_artifact_blocks_until_stamped(self):
++        H.run_cli(self.repo, "migrate")
++        r = H.run_cli(self.repo, "next")
++        self.assertEqual(r.returncode, 1)
++        self.assertIn("requirements.md", r.stdout)
++        H.write_artifact(self.repo, "requirements.md", "restamped" + NL)
++        self.assertEqual(H.run_cli(self.repo, "next").returncode, 0)
++
++    def test_migrate_preserves_phase_title_mode_and_history(self):
++        core.write_state(self.repo, {"title": "Keep", "phase": 4, "mode": "soft", "paused": True,
++                                     "history": [{"phase": 3}]})
++        H.run_cli(self.repo, "migrate")
++        st = state(self.repo)
++        self.assertEqual((st["title"], st["phase"], st["mode"], st["paused"], st["history"]),
++                         ("Keep", 4, "soft", True, [{"phase": 3}]))
++
++    def test_migrate_without_sprint_fails(self):
++        repo = H.make_repo(self)
++        r = H.run_cli(repo, "migrate")
++        self.assertEqual(r.returncode, 1)
++        self.assertIn("No sprint", r.stdout)
++
++
++class HistoryDigests(unittest.TestCase):
++    def test_next_records_artifact_digests_in_history(self):
++        repo = H.make_repo(self)
++        H.run_cli(repo, "start", "S")
++        H.write_artifact(repo, "requirements.md", "req text")
++        self.assertEqual(H.run_cli(repo, "next").returncode, 0)
++        entry = state(repo)["history"][-1]
++        self.assertEqual(entry["phase"], 1)
++        self.assertEqual(entry["artifacts"], {"requirements.md": sha((H.sdlc(repo) / "requirements.md").read_bytes())})
++
++    def test_digests_accumulate_and_change_with_content(self):
++        repo = H.make_repo(self)
++        H.run_cli(repo, "start", "S")
++        H.write_artifact(repo, "requirements.md", "one")
++        H.run_cli(repo, "next")
++        H.write_artifact(repo, "backlog.md", "two")
++        H.run_cli(repo, "next")
++        h1, h2 = state(repo)["history"]
++        self.assertEqual(set(h1["artifacts"]), {"requirements.md"})
++        self.assertEqual(set(h2["artifacts"]), {"requirements.md", "backlog.md"})
++
++    def test_artifact_digests_unit_includes_glob_and_evidence_json(self):
++        repo = H.make_repo(self)
++        H.set_state(repo, phase=7)
++        H.stamp_phases_1_7(repo)
++        H.write_evidence(repo)
++        d = core.artifact_digests(repo)
++        self.assertIn("change-records/c1.md", d)
++        self.assertIn("verify-evidence.json", d)
++        self.assertIn("verify-evidence.md", d)
++        self.assertNotIn("gate-approval.md", d)
++        for k, v in d.items():
++            self.assertEqual(v, sha((H.sdlc(repo) / k).read_bytes()))
++        self.assertEqual(set(core.artifact_digests(repo, 1)), {"requirements.md", "verify-evidence.json"})
++
++
++# ---------------------------------------------------------------- pm_review integration
++@unittest.skipUnless(NODE, "NOT_RUN: node is not available; fake review.js cannot be executed")
++class PmReviewFlow(unittest.TestCase):
++    def setUp(self):
++        self.repo = H.make_repo(self)
++        self.first = H.first_commit(self.repo)
++        H.commit_file(self.repo, "a.txt")
++        H.set_state(self.repo, phase=8)
++        H.stamp_phases_1_7(self.repo)
++        H.write_evidence(self.repo)
++        self.tools = H.tmpdir(self)
++        (self.tools / "review.js").write_text(H.FAKE_REVIEW_JS, encoding="utf-8")
++        self.calls = self.tools / "calls.txt"
++        self.argv = self.tools / "argv.json"
++
++    def request(self, kind="code", **opts):
++        cfg = {"result": APPROVE, "argv_out": str(self.argv), "packet_out": str(self.tools / "packet.md"),
++               "calls_out": str(self.calls)}
++        cfg.update(opts)
++        (self.tools / "cfg.json").write_text(json.dumps(cfg), encoding="utf-8")
++        env = {"AF_PM_REVIEW_JS": str(self.tools / "review.js"), "FAKE_CFG": str(self.tools / "cfg.json")}
++        buf = io.StringIO()
++        with mock.patch.dict(os.environ, env), contextlib.redirect_stdout(buf):
++            rc = pm_review.request(self.repo, kind, self.first)
++        return rc, buf.getvalue()
++
++    def call_log(self):
++        return self.calls.read_text(encoding="utf-8").split() if self.calls.exists() else []
++
++    def approval(self):
++        return json.loads((H.sdlc(self.repo) / ".pm-review" / "approval.json").read_text(encoding="utf-8"))
++
++    def no_approval_files(self):
++        self.assertFalse((H.sdlc(self.repo) / ".pm-review" / "approval.json").exists())
++        self.assertFalse((H.sdlc(self.repo) / "gate-approval.md").exists())
++
++    def refused_before_review(self, rc, out, needle=None):
++        self.assertEqual(rc, 2, out)
++        self.assertIn("REFUSED", out)
++        if needle:
++            self.assertIn(needle, out)
++        self.assertEqual(self.call_log(), [])
++        self.no_approval_files()
++
++    # --- evidence integration
++    def test_baseline_approves_and_runs_dump_then_real(self):
++        rc, out = self.request()
++        self.assertEqual(rc, 0, out)
++        self.assertEqual(self.call_log(), ["dump", "real"])
++
++    def test_old_markdown_headings_no_longer_satisfy_code_review(self):
++        (H.sdlc(self.repo) / "verify-evidence.json").unlink()
++        H.write_artifact(self.repo, "verify-evidence.md", "## Test evidence" + NL + "## NOT_RUN" + NL)
++        self.refused_before_review(*self.request(), "verify-evidence.json")
++
++    def test_invalid_evidence_variants_refused_before_review(self):
++        cases = {
++            "red": dict(runs=[{"command": "x", "total": 2, "passed": 1, "failed": 1, "errors": 0, "skipped": 0}]),
++            "zero": dict(runs=[{"command": "x", "total": 0, "passed": 0, "failed": 0, "errors": 0, "skipped": 0}]),
++            "contradictory": dict(runs=[{"command": "x", "total": 9, "passed": 1, "failed": 0, "errors": 0, "skipped": 0}]),
++            "open_major": dict(findings={"open_blocker": 0, "open_major": 1}),
++            "bad_reviewer": dict(reviewers=[{"role": "x"}]),
++        }
++        for label, over in cases.items():
++            with self.subTest(case=label):
++                H.write_evidence(self.repo, **over)
++                self.refused_before_review(*self.request(), "not acceptable")
++
++    def test_code_changed_after_tested_head_refused(self):
++        H.commit_file(self.repo, "later.py", "z" + NL)
++        self.refused_before_review(*self.request(), "code changed after the tested head")
++
++    def test_docs_only_change_after_tested_head_allowed(self):
++        H.commit_file(self.repo, "docs/note.md", "n" + NL)
++        rc, out = self.request()
++        self.assertEqual(rc, 0, out)
++
++    def test_docs_kind_does_not_need_json_evidence(self):
++        (H.sdlc(self.repo) / "verify-evidence.json").unlink()
++        rc, out = self.request(kind="docs")
++        self.assertEqual(rc, 0, out)
++
++    def test_packet_includes_structured_evidence(self):
++        H.write_evidence(self.repo, not_run=[{"item": "JSON-MARKER-ITEM", "reason": "r"}])
++        rc, out = self.request()
++        self.assertEqual(rc, 0, out)
++        packet = (self.tools / "packet.md").read_text(encoding="utf-8")
++        self.assertIn("verify-evidence.json", packet)
++        self.assertIn("JSON-MARKER-ITEM", packet)
++
++    # --- sprint id integration
++    def test_legacy_state_refused_with_migrate_hint(self):
++        st = state(self.repo)
++        del st["sprint_id"]
++        core.write_state(self.repo, st)
++        self.refused_before_review(*self.request(), "migrate")
++
++    def test_unstamped_phase_artifact_refused(self):
++        H.write_artifact(self.repo, "design.md", "no stamp", stamp=False)
++        self.refused_before_review(*self.request(), "design.md")
++
++    def test_artifact_stamped_with_other_sprint_refused(self):
++        H.write_artifact(self.repo, "test-plan.md", "old", stamp="ffffffffffff")
++        self.refused_before_review(*self.request(), "test-plan.md")
++
++    def test_missing_phase_6_artifact_refused(self):
++        shutil.rmtree(H.sdlc(self.repo) / "change-records")
++        self.refused_before_review(*self.request(), "phase 6")
++
++    def test_no_sprint_state_does_not_require_stamps(self):
++        (H.sdlc(self.repo) / "state.json").unlink()
++        rc, out = self.request()
++        self.assertEqual(rc, 0, out)
++
++    # --- prompt pre-computation
++    def test_approval_records_hashes_digests_and_sprint(self):
++        rc, out = self.request()
++        self.assertEqual(rc, 0, out)
++        a = self.approval()
++        head = core.head(self.repo)
++        prompt_file = H.sdlc(self.repo) / ".pm-review" / f"prompt-code-{head[:12]}.txt"
++        prompt = prompt_file.read_text(encoding="utf-8")
++        self.assertEqual(a["expected_input_hash"], sha(prompt.encode("utf-8")))
++        self.assertEqual(a["input_hash"], a["expected_input_hash"])
++        self.assertIn(head, prompt)
++        diff = H.git(self.repo, "diff", f"{self.first}...{head}")
++        self.assertEqual(a["diff_sha256"], sha(diff.encode("utf-8")))
++        cut = prompt.index("Diff:" + NL + "```diff" + NL) + len("Diff:" + NL + "```diff" + NL)
++        self.assertEqual(a["diff_in_prompt_sha256"], sha(prompt[cut:].encode("utf-8")))
++        self.assertIn(diff.strip(), prompt[cut:])
++        self.assertEqual(a["evidence_sha256"], sha((H.sdlc(self.repo) / "verify-evidence.json").read_bytes()))
++        self.assertEqual(a["sprint_id"], H.TEST_SID)
++        self.assertEqual(a["artifacts"], core.artifact_digests(self.repo))
++        self.assertIn("verify-evidence.json", a["artifacts"])
++
++    def test_dump_env_vars_reach_review_js_on_precompute_only(self):
++        self.request()
++        self.assertEqual(self.call_log(), ["dump", "real"])
++
++    def test_wrong_review_input_hash_not_approved_no_files(self):
++        rc, out = self.request(bad_hash="0" * 64)
++        self.assertEqual(rc, 1, out)
++        self.assertIn("NOT_APPROVED", out)
++        self.assertIn("reviewInputHash", out)
++        self.assertEqual(self.call_log(), ["dump", "real"])
++        self.no_approval_files()
++        self.assertFalse(pm_review.verify(self.repo)[0])
++
++    def test_hash_from_old_style_result_not_approved(self):
++        rc, out = self.request(keep_hash=True)  # APPROVE carries reviewInputHash "hash-1"
++        self.assertEqual(rc, 1, out)
++        self.no_approval_files()
++
++    def test_missing_dump_refused_and_review_not_sent(self):
++        rc, out = self.request(dump_mode="empty")
++        self.assertEqual(rc, 2, out)
++        self.assertIn("REFUSED", out)
++        self.assertEqual(self.call_log(), ["dump"])  # only the dump-only call; the real review never ran
++        self.no_approval_files()
++
++    def test_prompt_lacking_packet_or_head_refused(self):
++        rc, out = self.request(dump_mode="wrong")
++        self.assertEqual(rc, 2, out)
++        self.assertIn("does not contain", out)
++        self.assertEqual(self.call_log(), ["dump"])
++        self.no_approval_files()
++
++    def test_review_js_without_dump_support_refused(self):
++        rc, out = self.request(dump_mode="ignored")
++        self.assertEqual(rc, 2, out)
++        self.assertIn("REFUSED", out)
++        self.no_approval_files()
++
++    def test_cli_exit_codes_for_hash_mismatch_and_missing_dump(self):
++        for opts, code in (({"bad_hash": "1" * 64}, 1), ({"dump_mode": "empty"}, 2)):
++            with self.subTest(opts=opts):
++                cfg = {"result": APPROVE, "argv_out": str(self.argv), "packet_out": str(self.tools / "packet.md"),
++                       "calls_out": str(self.calls)}
++                cfg.update(opts)
++                (self.tools / "cfg.json").write_text(json.dumps(cfg), encoding="utf-8")
++                r = H.run_cli(self.repo, "pm-review", "--kind", "code", "--base", self.first,
++                              env={"AF_PM_REVIEW_JS": str(self.tools / "review.js"),
++                                   "FAKE_CFG": str(self.tools / "cfg.json")})
++                self.assertEqual(r.returncode, code, r.stdout + r.stderr)
++                self.no_approval_files()
++
++    # --- fixes: generated approval carries the sprint line; CRLF / non-ASCII byte-exact hashing
++    def test_genuine_review_then_next_advances_to_phase_9(self):
++        rc, out = self.request()
++        self.assertEqual(rc, 0, out)
++        gate = (H.sdlc(self.repo) / "gate-approval.md").read_text(encoding="utf-8")
++        self.assertIn("Sprint: " + H.TEST_SID, gate)
++        self.assertIn(core.head(self.repo), gate)
++        r = H.run_cli(self.repo, "next")
++        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
++        self.assertEqual(state(self.repo)["phase"], 9)
++        self.assertEqual(state(self.repo)["history"][-1]["phase"], 8)
++
++    def test_genuine_review_via_cli_then_next(self):
++        cfg = {"result": APPROVE, "argv_out": str(self.argv), "packet_out": str(self.tools / "packet.md")}
++        (self.tools / "cfg.json").write_text(json.dumps(cfg), encoding="utf-8")
++        env = {"AF_PM_REVIEW_JS": str(self.tools / "review.js"), "FAKE_CFG": str(self.tools / "cfg.json")}
++        r = H.run_cli(self.repo, "pm-review", "--kind", "code", "--base", self.first, env=env)
++        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
++        self.assertEqual(H.run_cli(self.repo, "verify").returncode, 0)
++        self.assertEqual(H.run_cli(self.repo, "next").returncode, 0)
++        self.assertEqual(state(self.repo)["phase"], 9)
++
++    def test_no_sprint_state_means_no_sprint_line(self):
++        (H.sdlc(self.repo) / "state.json").unlink()
++        rc, out = self.request()
++        self.assertEqual(rc, 0, out)
++        gate = (H.sdlc(self.repo) / "gate-approval.md").read_text(encoding="utf-8")
++        self.assertNotIn("Sprint:", gate)
++        self.assertIn(core.head(self.repo), gate)
++
++    def test_docs_approval_carries_sprint_line(self):
++        rc, out = self.request(kind="docs")
++        self.assertEqual(rc, 0, out)
++        self.assertIn("Sprint: " + H.TEST_SID, (H.sdlc(self.repo) / "docs-approval.md").read_text(encoding="utf-8"))
++
++    def test_crlf_in_diff_and_non_ascii_packet_hash_is_byte_exact(self):
++        ev = H.write_evidence(self.repo)
++        ev["not_run"] = [{"item": "Pr" + chr(252) + "fung " + chr(8212) + " " + chr(1090) + chr(1077) + chr(1089) + chr(1090),
++                          "reason": "caf" + chr(233) + " " + chr(26085) + chr(26412)}]
++        (H.sdlc(self.repo) / "verify-evidence.json").write_text(json.dumps(ev, ensure_ascii=False), encoding="utf-8")
++        H.write_artifact(self.repo, "design.md", "design " + chr(1076) + chr(1080) + chr(1079) + chr(1072) + chr(1081) + chr(1085))
++        rc, out = self.request(raw_bytes=True, inject_crlf=True)
++        self.assertEqual(rc, 0, out)
++        packet_bytes = (H.sdlc(self.repo) / ".pm-review" / f"packet-code-{core.head(self.repo)[:12]}.md").read_bytes()
++        self.assertNotIn(bytes([13]), packet_bytes)
++        self.assertIn(("Pr" + chr(252) + "fung").encode("utf-8"), packet_bytes)
++        prompt_bytes = (H.sdlc(self.repo) / ".pm-review" / f"prompt-code-{core.head(self.repo)[:12]}.txt").read_bytes()
++        self.assertIn(bytes([13, 10]), prompt_bytes)  # CRLF really survived inside the dumped Diff block
++        a = self.approval()
++        self.assertEqual(a["expected_input_hash"], sha(prompt_bytes))
++        self.assertEqual(a["input_hash"], a["expected_input_hash"])
++        self.assertTrue(pm_review.verify(self.repo)[0])
++
++    def test_crlf_hash_mismatch_still_rejected(self):
++        rc, out = self.request(raw_bytes=True, inject_crlf=True, bad_hash="2" * 64)
++        self.assertEqual(rc, 1, out)
++        self.no_approval_files()
++
++    # --- verify() detects artifact edits after approval
++    def approved(self):
++        rc, out = self.request()
++        self.assertEqual(rc, 0, out)
++        ok, why = pm_review.verify(self.repo)
++        self.assertTrue(ok, why)
++
++    def test_verify_detects_edited_phase_artifact(self):
++        self.approved()
++        p = H.sdlc(self.repo) / "design.md"
++        original = p.read_bytes()
++        p.write_bytes(original + b"tampered")
++        ok, why = pm_review.verify(self.repo)
++        self.assertFalse(ok)
++        self.assertIn("artifacts changed after the approval", why)
++        self.assertIn("design.md", why)
++        p.write_bytes(original)
++        self.assertTrue(pm_review.verify(self.repo)[0])
++
++    def test_verify_detects_edited_structured_evidence(self):
++        self.approved()
++        p = H.sdlc(self.repo) / "verify-evidence.json"
++        d = json.loads(p.read_text(encoding="utf-8"))
++        d["runs"][0]["passed"] = 10
++        d["runs"][0]["total"] = 11
++        p.write_text(json.dumps(d), encoding="utf-8")
++        ok, why = pm_review.verify(self.repo)
++        self.assertFalse(ok)
++        self.assertIn("verify-evidence.json", why)
++
++    def test_verify_detects_deleted_and_added_artifacts(self):
++        self.approved()
++        extra = H.sdlc(self.repo) / "change-records" / "c2.md"
++        H.write_artifact(self.repo, "change-records/c2.md", "extra")
++        ok, why = pm_review.verify(self.repo)
++        self.assertFalse(ok)
++        self.assertIn("c2.md", why)
++        extra.unlink()
++        self.assertTrue(pm_review.verify(self.repo)[0])
++        (H.sdlc(self.repo) / "backlog.md").unlink()
++        ok, why = pm_review.verify(self.repo)
++        self.assertFalse(ok)
++        self.assertIn("backlog.md", why)
++
++    def test_untouched_artifacts_keep_approval_valid_and_gate_allows_push(self):
++        self.approved()
++        from af import hook
++        self.assertIsNone(hook.gate_decision(self.repo, "git push"))
++        p = H.sdlc(self.repo) / "requirements.md"
++        p.write_bytes(p.read_bytes() + b"x")
++        self.assertIsNotNone(hook.gate_decision(self.repo, "git push"))
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tools/af/core.py b/tools/af/core.py
+index 549ea00..5d60164 100644
+--- a/tools/af/core.py
++++ b/tools/af/core.py
+@@ -2,9 +2,11 @@
+ from __future__ import annotations
+ 
+ import glob
++import hashlib
+ import json
+ import os
+ import subprocess
++import uuid
+ from datetime import datetime, timezone
+ from pathlib import Path
+ 
+@@ -70,27 +72,46 @@ def write_state(project: Path, state: dict) -> None:
+     (d / "STATE.md").write_text(render_state_md(project, state), encoding="utf-8")
+ 
+ 
+-def artifact_present(project: Path, pattern: str, since: float | None = None) -> bool:
+-    """An artifact counts only if it exists and (when `since` is given) was written after the sprint started."""
++def artifact_present(project: Path, pattern: str, sprint_id: str | None = None) -> bool:
++    """An artifact counts when it exists and, for a state with a sprint id, carries that id in its text."""
+     for f in glob.glob(str(state_dir(project) / pattern)):
+-        if since is None or os.path.getmtime(f) >= since:
++        if not os.path.isfile(f):
++            continue
++        if sprint_id is None:
+             return True
++        try:
++            if sprint_id in open(f, encoding="utf-8", errors="replace").read():
++                return True
++        except OSError:
++            continue
+     return False
+ 
+ 
+ def missing_artifacts(project: Path, n: int) -> list[str]:
+-    st = read_state(project) or {}
+-    since = st.get("started_epoch")
+-    return [a for a in phase_def(n)["artifacts"] if not artifact_present(project, a, since)]
++    sid = (read_state(project) or {}).get("sprint_id")
++    return [a for a in phase_def(n)["artifacts"] if not artifact_present(project, a, sid)]
++
++
++def artifact_digests(project: Path, upto: int = 7) -> dict:
++    """sha256 of every artifact of phases 1..upto plus the structured evidence file (posix keys relative to state_dir)."""
++    root = state_dir(project)
++    out: dict = {}
++    pats = [a for n in range(1, upto + 1) for a in phase_def(n)["artifacts"]] + ["verify-evidence.json"]
++    for pat in pats:
++        for f in sorted(glob.glob(str(root / pat))):
++            if os.path.isfile(f):
++                out[Path(f).relative_to(root).as_posix()] = hashlib.sha256(Path(f).read_bytes()).hexdigest()
++    return out
+ 
+ 
+ def new_sprint_state(project: Path, title: str, mode: str) -> dict:
+-    """Initial state; remembers the start time and HEAD so stale artifacts and narrowed review bases are rejected."""
++    """Initial state with a sprint id (phase artifacts must carry it), the start time and HEAD."""
+     try:
+         start_head = head(project)
+     except Exception:
+         start_head = None
+     return {"title": title, "phase": 1, "mode": mode, "paused": False, "history": [],
++            "sprint_id": uuid.uuid4().hex[:12],
+             "started_epoch": datetime.now(timezone.utc).timestamp(), "start_head": start_head}
+ 
+ 
+diff --git a/tools/af/deploy.py b/tools/af/deploy.py
+index 548142a..8f2dde0 100644
+--- a/tools/af/deploy.py
++++ b/tools/af/deploy.py
+@@ -95,7 +95,7 @@ def build(clean: bool = True) -> list[str]:
+             (out / "prompts").mkdir(parents=True, exist_ok=True)
+             head = ["---", f"description: {json.dumps(desc)}", "argument-hint: on|off|status|next|verify", "---", ""]
+             (out / "prompts" / "af.md").write_text(
+-                NL.join(head) + NL + af_cmd + NL + "Arguments: $ARGUMENTS" + NL, encoding="utf-8")
++                NL.join(head) + NL + af_cmd, encoding="utf-8")  # Codex appends the typed arguments itself
+             written.append("deploy/codex/prompts/af.md")
+         shutil.copy(ROOT / "core" / "orchestration" / "phase-map.json", out / "phase-map.json")
+         written.append(str((out / "phase-map.json").relative_to(ROOT)))
+diff --git a/tools/af/evidence.py b/tools/af/evidence.py
+new file mode 100644
+index 0000000..b2e97ac
+--- /dev/null
++++ b/tools/af/evidence.py
+@@ -0,0 +1,98 @@
++"""Structured phase-7 verification evidence (docs/sdlc/verify-evidence.json).
++
++The PM-GPT reviewer stays the judge of sufficiency; this module only refuses evidence that is
++missing, malformed, contradictory, red, stale against the code, or has open blocking findings.
++
++Schema (all keys required unless marked optional):
++{
++  "tested_head": "<git sha the tests ran against>",
++  "runs": [{"command": str, "total": int, "passed": int, "failed": int, "errors": int,
++            "skipped": int, "log": str (optional)}],
++  "not_run": [{"item": str, "reason": str}],
++  "findings": {"open_blocker": int, "open_major": int},
++  "reviewers": [{"role": str, "model": str, "effort": str, "verdict": str}]   # may be empty
++}
++"""
++from __future__ import annotations
++
++import json
++from pathlib import Path
++
++from . import core
++
++FILE = "verify-evidence.json"
++# Paths whose changes after the tested head do not invalidate test evidence.
++NON_CODE_PREFIXES = ("docs/",)
++NON_CODE_FILES = ("core/DECISION_LOG.md", "core/LESSONS_LOG.md", "core/BACKLOG.md")
++
++
++def _text(v) -> bool:
++    return isinstance(v, str) and bool(v.strip())
++
++
++def _int(v) -> bool:
++    return isinstance(v, int) and not isinstance(v, bool) and v >= 0
++
++
++def validate(project: Path, head_sha: str) -> list[str]:
++    path = core.state_dir(project) / FILE
++    if not path.is_file():
++        return [f"{FILE} is missing"]
++    try:
++        d = json.loads(path.read_text(encoding="utf-8"))
++    except ValueError as exc:
++        return [f"{FILE} is not valid JSON: {exc}"]
++    if not isinstance(d, dict):
++        return [f"{FILE} must be a JSON object"]
++    problems: list[str] = []
++    tested = d.get("tested_head")
++    if not isinstance(tested, str) or len(tested) < 7:
++        problems.append("tested_head is missing")
++    else:
++        try:
++            full = core.git(project, "rev-parse", "--verify", f"{tested}^{{commit}}").strip()
++            core.git(project, "merge-base", "--is-ancestor", full, head_sha)
++            changed = core.git(project, "diff", "--name-only", f"{full}..{head_sha}").splitlines()
++            code = [c for c in changed if not (c.startswith(NON_CODE_PREFIXES) or c in NON_CODE_FILES)]
++            if code:
++                problems.append(f"code changed after the tested head {full[:12]}: {', '.join(code[:5])}"
++                                f"{' ...' if len(code) > 5 else ''}; re-run the tests")
++        except RuntimeError:
++            problems.append(f"tested_head {tested!r} is not an ancestor commit of HEAD")
++    runs = d.get("runs")
++    if not isinstance(runs, list) or not runs:
++        problems.append("runs must be a non-empty list")
++    else:
++        for i, r in enumerate(runs):
++            if not isinstance(r, dict) or not isinstance(r.get("command"), str) or not r["command"].strip():
++                problems.append(f"runs[{i}].command is missing")
++                continue
++            if not all(_int(r.get(k)) for k in ("total", "passed", "failed", "errors", "skipped")):
++                problems.append(f"runs[{i}] needs integer total/passed/failed/errors/skipped")
++                continue
++            if r["total"] != r["passed"] + r["failed"] + r["errors"] + r["skipped"]:
++                problems.append(f"runs[{i}] counts are contradictory (total != passed+failed+errors+skipped)")
++            if r["total"] == 0:
++                problems.append(f"runs[{i}] ran zero tests")
++            if r["failed"] or r["errors"]:
++                problems.append(f"runs[{i}] is red ({r['failed']} failed, {r['errors']} errors)")
++    nr = d.get("not_run")
++    if not isinstance(nr, list):
++        problems.append("not_run must be a list (may be empty)")
++    else:
++        for i, x in enumerate(nr):
++            if not (isinstance(x, dict) and _text(x.get("item")) and _text(x.get("reason"))):
++                problems.append(f"not_run[{i}] needs item and reason")
++    f = d.get("findings")
++    if not (isinstance(f, dict) and _int(f.get("open_blocker")) and _int(f.get("open_major"))):
++        problems.append("findings needs integer open_blocker and open_major")
++    elif f["open_blocker"] or f["open_major"]:
++        problems.append(f"open blocking findings: {f['open_blocker']} blocker, {f['open_major']} major")
++    rv = d.get("reviewers")
++    if not isinstance(rv, list):
++        problems.append("reviewers must be a list (may be empty)")
++    else:
++        for i, x in enumerate(rv):
++            if not (isinstance(x, dict) and all(_text(x.get(k)) for k in ("role", "model", "effort", "verdict"))):
++                problems.append(f"reviewers[{i}] needs role, model, effort, verdict")
++    return problems
+diff --git a/tools/af/hook.py b/tools/af/hook.py
+index b86d707..5df0b62 100644
+--- a/tools/af/hook.py
++++ b/tools/af/hook.py
+@@ -136,7 +136,8 @@ def context_line(project: Path) -> str | None:
+     p = core.phase_def(n)
+     miss = core.missing_artifacts(project, n)
+     roles = ", ".join(p["roles"]) or "PM-GPT via skill pm-gpt-review"
+-    return (f"[Agentic_Framework SDLC] sprint '{state.get('title', '')}' phase {n} {p['name']}. "
++    return (f"[Agentic_Framework SDLC] sprint '{state.get('title', '')}' (id {state.get('sprint_id') or 'legacy'}; "
++            f"every phase artifact must contain the line `Sprint: <id>`) phase {n} {p['name']}. "
+             f"Missing exit artifacts: {', '.join(miss) or 'none'}. Launch as real agents: {roles}. "
+             f"Skills: {', '.join(p['skills'])}. Advance with af_cli.py next; never self-approve phase 8.")
+ 
+diff --git a/tools/af/pm_review.py b/tools/af/pm_review.py
+index 85a992c..b7326bb 100644
+--- a/tools/af/pm_review.py
++++ b/tools/af/pm_review.py
+@@ -2,19 +2,24 @@
+ 
+ `request` sends the exact committed range to PM Bridge (`review.js --final`), accepts only a
+ correlated, concluding APPROVE, and binds the approval to the git HEAD that was reviewed.
+-`verify` is the mechanical push gate: it passes only while HEAD still equals the approved head.
++Before sending it validates the structured evidence (tools/af/evidence.py), the sprint artifacts and
++the review base, and it pre-computes the exact prompt PM Bridge will send (review.js is
++deterministic and has a prompt-dump mode) so the returned `reviewInputHash` can be compared with it.
++`verify` is the mechanical push gate: it passes only while HEAD, the artifacts and the approval agree.
+ The same tool serves Claude and GPT/Codex sessions; the approval is tool-agnostic.
+ """
+ from __future__ import annotations
+ 
+ import hashlib
+ import json
++import os
+ import subprocess
+ from pathlib import Path
+ 
+-from . import core
++from . import core, evidence
+ 
+ KINDS = ("code", "docs")
++DIFF_OPEN = "Diff:\n```diff\n"
+ 
+ 
+ def _paths(project: Path, kind: str) -> tuple[Path, Path]:
+@@ -25,6 +30,10 @@ def _paths(project: Path, kind: str) -> tuple[Path, Path]:
+     return pm / "approval-docs.json", sd / "docs-approval.md"
+ 
+ 
++def _sha(data: bytes) -> str:
++    return hashlib.sha256(data).hexdigest()
++
++
+ def build_packet(project: Path, kind: str, base: str, head_sha: str) -> str:
+     sd = core.state_dir(project)
+     parts = [
+@@ -36,12 +45,12 @@ def build_packet(project: Path, kind: str, base: str, head_sha: str) -> str:
+         "`SEVERITY | basis | claim | evidence | required change`.",
+         "Approve only if the exact head is safe to push. Verify claims against the diff.",
+     ]
+-    for name in ("verify-evidence.md", "review-record.md", "test-plan.md", "requirements.md", "backlog.md", "design.md"):
++    names = ["verify-evidence.json", "verify-evidence.md", "review-record.md", "test-plan.md",
++             "requirements.md", "backlog.md", "design.md"]
++    for name in names:
+         f = sd / name
+         if f.is_file():
+-            parts.append(f"\n## Evidence file: {name}\n{f.read_text(encoding='utf-8', errors='replace')}")
+-        elif kind == "code" and name == "verify-evidence.md":
+-            parts.append("\n## Evidence file: verify-evidence.md\nMISSING (treat all verification as NOT_RUN)")
++            parts.append(f"\n## Evidence file: {name} (sha256 {_sha(f.read_bytes())})\n{f.read_text(encoding='utf-8', errors='replace')}")
+     return "\n".join(parts)
+ 
+ 
+@@ -63,17 +72,20 @@ def _accept(result: dict) -> tuple[bool, str]:
+     return True, "ok"
+ 
+ 
+-EVIDENCE_HEADINGS = ("## Test evidence", "## NOT_RUN")
+-
+-
+ def _preflight(project: Path, kind: str, base: str, head_sha: str) -> str | None:
+-    """Reject incomplete evidence and review ranges that do not cover the sprint."""
++    """Reject incomplete evidence, unstamped artifacts and review ranges that do not cover the sprint."""
+     if kind == "code":
+-        ev = core.state_dir(project) / "verify-evidence.md"
+-        text = ev.read_text(encoding="utf-8", errors="replace") if ev.is_file() else ""
+-        missing = [h for h in EVIDENCE_HEADINGS if h not in text]
+-        if missing:
+-            return f"verify-evidence.md is missing or lacks required sections {missing}; produce the phase-7 evidence first."
++        problems = evidence.validate(project, head_sha)
++        if problems:
++            return "verify-evidence.json is not acceptable: " + "; ".join(problems)
++        st = core.read_state(project)
++        if st:
++            if not st.get("sprint_id"):
++                return "legacy sprint state without sprint_id; run `af_cli.py migrate` and re-stamp the artifacts"
++            for n in range(1, 8):
++                miss = core.missing_artifacts(project, n)
++                if miss:
++                    return f"phase {n} artifacts missing or not stamped with sprint id {st['sprint_id']}: {', '.join(miss)}"
+     try:
+         base_sha = core.git(project, "rev-parse", "--verify", f"{base}^{{commit}}").strip()
+     except RuntimeError as exc:
+@@ -81,8 +93,7 @@ def _preflight(project: Path, kind: str, base: str, head_sha: str) -> str | None
+     anc = subprocess.run(["git", "-C", str(project), "merge-base", "--is-ancestor", base_sha, head_sha])
+     if anc.returncode != 0:
+         return f"base {base_sha[:12]} is not an ancestor of HEAD"
+-    st = core.read_state(project) or {}
+-    start = st.get("start_head")
++    start = (core.read_state(project) or {}).get("start_head")
+     if kind == "code" and start:
+         cov = subprocess.run(["git", "-C", str(project), "merge-base", "--is-ancestor", base_sha, start])
+         if cov.returncode != 0:
+@@ -93,6 +104,22 @@ def _preflight(project: Path, kind: str, base: str, head_sha: str) -> str | None
+     return None
+ 
+ 
++def _review_cmd(node: str, review_js: Path, project: Path, base: str, packet: Path, project_id: str | None) -> list[str]:
++    cmd = [node, str(review_js), "--cwd", str(project), "--base", base, "--final", "--scope-note-file", str(packet)]
++    if project_id:
++        cmd += ["--project", project_id]
++    return cmd
++
++
++def _expected_prompt(cmd: list[str], dump: Path) -> str | None:
++    """Ask review.js for the exact prompt it will send (dump-only mode: no browser, no receipt)."""
++    env = dict(os.environ, PM_BRIDGE_DEBUG_DUMP_PROMPT=str(dump), PM_BRIDGE_DEBUG_DUMP_PROMPT_ONLY="1")
++    if dump.exists():
++        dump.unlink()
++    subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False, env=env)
++    return dump.read_bytes().decode("utf-8") if dump.is_file() else None
++
++
+ def request(project: Path, kind: str, base: str, node: str = "node", project_id: str | None = None) -> int:
+     if kind not in KINDS:
+         raise SystemExit(f"kind must be one of {KINDS}")
+@@ -113,10 +140,22 @@ def request(project: Path, kind: str, base: str, node: str = "node", project_id:
+     pm_dir = sd / ".pm-review"
+     pm_dir.mkdir(parents=True, exist_ok=True)
+     packet = pm_dir / f"packet-{kind}-{head_sha[:12]}.md"
+-    packet.write_text(build_packet(project, kind, base, head_sha), encoding="utf-8")
+-    cmd = [node, str(review_js), "--cwd", str(project), "--base", base, "--final", "--scope-note-file", str(packet)]
+-    if project_id:
+-        cmd += ["--project", project_id]
++    packet.write_bytes(build_packet(project, kind, base, head_sha).encode("utf-8"))  # LF bytes, no newline translation
++    cmd = _review_cmd(node, review_js, project, base, packet, project_id)
++
++    prompt = _expected_prompt(cmd, pm_dir / f"prompt-{kind}-{head_sha[:12]}.txt")
++    if prompt is None:
++        print("REFUSED: could not pre-compute the review prompt (review.js dump mode unavailable); "
++              "the returned input hash could not be bound. No review sent.")
++        return 2
++    packet_text = packet.read_bytes().decode("utf-8")
++    if packet_text.strip() not in prompt or head_sha not in prompt:
++        print("REFUSED: the pre-computed prompt does not contain the evidence packet and the exact head.")
++        return 2
++    expected_hash = _sha(prompt.encode("utf-8"))
++    cut = prompt.find(DIFF_OPEN)
++    diff_in_prompt = prompt[cut + len(DIFF_OPEN):] if cut >= 0 else ""
++
+     proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)
+     try:
+         result = json.loads(proc.stdout.strip().splitlines()[-1])
+@@ -131,20 +170,29 @@ def request(project: Path, kind: str, base: str, node: str = "node", project_id:
+     if not ok:
+         print(f"NOT_APPROVED: {why}. Verdict={result.get('verdict')}.\n--- reply ---\n{(result.get('reply') or '')[:6000]}")
+         return 1
++    if result.get("reviewInputHash") != expected_hash:
++        print(f"NOT_APPROVED: reviewInputHash {result.get('reviewInputHash')} does not match the pre-computed "
++              f"prompt hash {expected_hash}; the reviewed input is not the one we prepared.")
++        return 1
++    base_sha = core.git(project, "rev-parse", f"{base}^{{commit}}").strip()
++    ev_json = sd / evidence.FILE
+     approval = {
+         "approval_id": f"PMG-{core.now_iso()[:10].replace('-', '')}-{head_sha[:8]}",
+         "kind": kind,
+         "head": head_sha,
+         "base": base,
++        "base_sha": base_sha,
+         "verdict": result["verdict"],
+         "request_id": result["reviewRequestId"],
+         "reply_id": result["replyId"],
+-        "input_hash": result.get("reviewInputHash"),
+-        "base_sha": core.git(project, "rev-parse", f"{base}^{{commit}}").strip(),
+-        "diff_sha256": hashlib.sha256(core.git(project, "diff", f"{base}...{head_sha}").encode("utf-8", "replace")).hexdigest(),
+-        "evidence_sha256": hashlib.sha256((core.state_dir(project) / "verify-evidence.md").read_bytes()).hexdigest()
+-        if (core.state_dir(project) / "verify-evidence.md").is_file() else None,
+-        "reply_sha256": hashlib.sha256((result.get("reply") or "").encode("utf-8")).hexdigest(),
++        "input_hash": result["reviewInputHash"],
++        "expected_input_hash": expected_hash,
++        "diff_sha256": _sha(core.git(project, "diff", f"{base_sha}...{head_sha}").encode("utf-8", "replace")),
++        "diff_in_prompt_sha256": _sha(diff_in_prompt.encode("utf-8")),
++        "evidence_sha256": _sha(ev_json.read_bytes()) if ev_json.is_file() else None,
++        "sprint_id": (core.read_state(project) or {}).get("sprint_id"),
++        "artifacts": core.artifact_digests(project) if kind == "code" else {},
++        "reply_sha256": _sha((result.get("reply") or "").encode("utf-8")),
+         "recorded": core.now_iso(),
+         "reviewer": "GPT-PM via PM Bridge review.js",
+     }
+@@ -154,7 +202,9 @@ def request(project: Path, kind: str, base: str, node: str = "node", project_id:
+         "# PM-GPT approval\n\n"
+         f"Approval id: {approval['approval_id']}\nHead: {approval['head']}\nKind: {kind}\n"
+         f"Verdict: {approval['verdict']}\nRequest id: {approval['request_id']}\nReply id: {approval['reply_id']}\n"
+-        f"Recorded: {approval['recorded']}\n\nGenerated by tools/af_cli.py pm-review. Do not edit by hand.\n",
++        f"Recorded: {approval['recorded']}\n"
++        + (f"Sprint: {approval['sprint_id']}\n" if approval["sprint_id"] else "")
++        + "\nGenerated by tools/af_cli.py pm-review. Do not edit by hand.\n",
+         encoding="utf-8",
+     )
+     print(f"APPROVED: {approval['approval_id']} head={head_sha}")
+@@ -175,6 +225,12 @@ def verify(project: Path, kind: str = "code") -> tuple[bool, str]:
+         return False, "approval lacks correlated ids"
+     if not mpath.is_file() or a["head"] not in mpath.read_text(encoding="utf-8"):
+         return False, f"{mpath.name} missing or does not match approval.json"
++    recorded = a.get("artifacts") or {}
++    if recorded:
++        now = core.artifact_digests(project)
++        changed = sorted(k for k in set(recorded) | set(now) if recorded.get(k) != now.get(k))
++        if changed:
++            return False, f"artifacts changed after the approval: {', '.join(changed[:5])}"
+     dirty = core.tracked_dirty(project)
+     if dirty:
+         return False, "tracked changes are uncommitted after the approval"
+diff --git a/tools/af_cli.py b/tools/af_cli.py
+index fac678b..8c3320e 100644
+--- a/tools/af_cli.py
++++ b/tools/af_cli.py
+@@ -17,7 +17,11 @@ from af import core, pm_review  # noqa: E402
+ 
+ 
+ def _project(args) -> Path:
+-    return core.git_root(Path(args.project or "."))
++    try:
++        return core.git_root(Path(args.project or "."))
++    except RuntimeError:
++        raise SystemExit(f"Not inside a git repository ({Path(args.project or '.').resolve()}). "
++                         "Run from the project folder or pass --project <repo>.")
+ 
+ 
+ def cmd_status(args) -> int:
+@@ -28,6 +32,7 @@ def cmd_status(args) -> int:
+         return 0
+     n = st["phase"]
+     d = core.phase_def(n)
++    print(f"Sprint id: {st.get('sprint_id') or '(legacy: run migrate)'}  (artifacts must contain `Sprint: <id>`)")
+     print(f"Sprint: {st.get('title')}  Phase: {n} {d['name']}  Mode: {st.get('mode')}  Paused: {bool(st.get('paused'))}")
+     print(f"Roles to launch: {', '.join(d['roles']) or '(PM-GPT via pm-gpt-review)'}")
+     print(f"Skills: {', '.join(d['skills'])}")
+@@ -68,6 +73,10 @@ def cmd_next(args) -> int:
+     if not st:
+         print("No sprint.")
+         return 1
++    if not st.get("sprint_id"):
++        print("BLOCKED: legacy sprint state without sprint_id. Run `af_cli.py migrate`, then stamp each artifact "
++              "with the printed `Sprint: <id>` line.")
++        return 1
+     n = st["phase"]
+     miss = core.missing_artifacts(p, n)
+     if miss and not args.force:
+@@ -82,7 +91,8 @@ def cmd_next(args) -> int:
+     if n >= 10:
+         print("Already at the last phase.")
+         return 0
+-    st["history"].append({"phase": n, "left": core.now_iso(), "head": core.head(p), "forced": bool(args.force)})
++    st["history"].append({"phase": n, "left": core.now_iso(), "head": core.head(p), "forced": bool(args.force),
++                          "artifacts": core.artifact_digests(p, n)})
+     st["phase"] = n + 1
+     core.write_state(p, st)
+     print(f"Advanced to phase {n + 1} {core.phase_def(n + 1)['name']}")
+@@ -119,6 +129,21 @@ def cmd_on(args) -> int:
+     return 0
+ 
+ 
++def cmd_migrate(args) -> int:
++    p = _project(args)
++    st = core.read_state(p)
++    if not st:
++        print("No sprint.")
++        return 1
++    if st.get("sprint_id"):
++        print(f"Already migrated: Sprint: {st['sprint_id']}")
++        return 0
++    st["sprint_id"] = core.new_sprint_state(p, st.get("title", ""), st.get("mode", "hard"))["sprint_id"]
++    core.write_state(p, st)
++    print(f"Migrated. Stamp every phase artifact with the line: Sprint: {st['sprint_id']}")
++    return 0
++
++
+ def cmd_off(args) -> int:
+     p = _project(args)
+     st = core.read_state(p)
+@@ -200,6 +225,7 @@ def main(argv=None) -> int:
+     sub.add_parser("resume").set_defaults(fn=lambda a: _set(a, paused=False))
+     s = sub.add_parser("on"); s.add_argument("--mode", default=None, choices=["hard", "soft"]); s.add_argument("--title", default="Sprint"); s.set_defaults(fn=cmd_on)
+     sub.add_parser("off").set_defaults(fn=cmd_off)
++    sub.add_parser("migrate").set_defaults(fn=cmd_migrate)
+     s = sub.add_parser("pm-review"); s.add_argument("--kind", choices=list(pm_review.KINDS), default="code"); s.add_argument("--base", required=True); s.add_argument("--node", default="node"); s.add_argument("--project-id"); s.set_defaults(fn=cmd_pm_review)
+     s = sub.add_parser("verify"); s.add_argument("--kind", choices=list(pm_review.KINDS), default="code"); s.set_defaults(fn=cmd_verify)
+     sub.add_parser("hook").set_defaults(fn=cmd_hook)
+
+```
+
+---
+
+EXECUTION AUTHORITY
+
+GO: AUTHORIZED
+PUSH: AUTHORIZED under the current Gate policy.
+
+Do not stop for routine approval.
+Do not bypass platform-enforced confirmations or security controls.
+
+REVIEW POLICY:
+Find the full BLOCKER/MAJOR set in one adversarial sweep.
+Do not issue one finding per review round.
+After remediation, verify only reported findings and direct regressions.
+Unrelated improvements go to ROADMAP, not back into the current Gate.
+
+CI THAT NEVER RAN:
+If a required GitHub check did not execute (steps: [], or a billing/spending-limit/runner annotation),
+a green local Docker/act run of the same workflow on the same head SHA counts as that check passing.
+Given that evidence, APPROVE the PR; Claude merges it with an admin merge that passes over only those
+non-executed checks. A check that ran and failed on the code is still a real failure.
+
+ESCALATION:
+Resolve technical disagreements internally for up to 5 evidence-based rounds.
+Escalate to CEO only when a real business/irreversible decision remains unresolved.

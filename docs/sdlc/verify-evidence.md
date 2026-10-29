@@ -24,6 +24,6 @@ See the not_run list in verify-evidence.json (real PM Bridge dump mode, real sch
 
 ## Curated agents change (change 0012, remediation of round 7)
 - Earlier complete run `full15.log`: 355 tests, 9 failures (7 outdated expectations, 2 forbidden wording); all fixed.
-- Focused re-run after those fixes: `test_curated`, `test_deploy`, `test_deploy_imported` = 41/41 (`sub17.log`).
+- Focused re-run after those fixes: `test_curated`, `test_deploy`, `test_deploy_imported` = 41/41 (`sub17.log`); after round 7 remediation five affected files = 77 tests, 76 OK, 1 self-skip (`sub19.log`).
 - Round 7 remediation (unresolved skill references, reporting-analyst state authority, installer warning) is covered by the focused run recorded in `verify-evidence.json`, which stays authoritative.
 - NOT_RUN: complete suite on the final tree (operator rule: no complete re-runs after small fixes).

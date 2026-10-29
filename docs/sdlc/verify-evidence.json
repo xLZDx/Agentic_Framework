@@ -1,14 +1,14 @@
 {
-  "tested_head": "2c18fd6f80b2a000176ddf2f6978b4ff9627ad4b",
+  "tested_head": "645f620c7240a0ea27f451747f7a8f02d57efbd6",
   "runs": [
     {
-      "command": "python -m unittest -v test_curated test_deploy test_deploy_imported (cwd tests)",
-      "total": 41,
-      "passed": 41,
+      "command": "python -m unittest -v test_curated test_deploy test_deploy_imported test_af_install test_externals (cwd tests)",
+      "total": 77,
+      "passed": 76,
       "failed": 0,
       "errors": 0,
-      "skipped": 0,
-      "log": "sub17.log (3 s)"
+      "skipped": 1,
+      "log": "sub19.log (61 s)"
     }
   ],
   "not_run": [
@@ -46,7 +46,7 @@
       "role": "functional-test-reviewer",
       "model": "sonnet",
       "effort": "medium",
-      "verdict": "affected files 41/41 green after fixes; full15 failures all fixed; no open product bugs"
+      "verdict": "affected files 76/77 green, 1 self-skip; round 7 findings fixed; no open product bugs"
     }
   ]
 }

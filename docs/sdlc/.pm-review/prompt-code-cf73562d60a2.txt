@@ -1,0 +1,190 @@
+Code review request for project "agentic_framework".
+
+Scope of THIS round -- read before reviewing:
+# PM-GPT code review request
+Project root: D:\Repo\Agentic_Framework
+Reviewed range: 75ee95b...cf73562d60a2b8f9539b3aa89331ae4dcabb31c4
+Exact HEAD under review: cf73562d60a2b8f9539b3aa89331ae4dcabb31c4
+Reply format: first line `VERDICT: APPROVE|MINOR|MAJOR|BLOCKER`, then one finding per line as `SEVERITY | basis | claim | evidence | required change`.
+Approve only if the exact head is safe to push. Verify claims against the diff.
+
+## Evidence file: verify-evidence.json (sha256 2b1c2a7f30469d9884321a20c3ea1becff2a53213bebeb84959f0473e492831b)
+{
+  "tested_head": "75ee95ba2996c5fbda483042d53f5b9304467575",
+  "runs": [
+    {
+      "command": "python -m unittest discover -s tests -v",
+      "total": 338,
+      "passed": 337,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 1,
+      "log": "full14.log (1129 s)"
+    }
+  ],
+  "not_run": [
+    {
+      "item": "real PM Bridge review.js dump-only mode with a live review",
+      "reason": "tests use a fake review.js; the real one was only exercised manually (two identical prompt dumps)"
+    },
+    {
+      "item": "real schtasks and registry operations",
+      "reason": "tests assert argv only; no real system state is changed by tests"
+    },
+    {
+      "item": "install into the real ~/.claude and ~/.codex from tests",
+      "reason": "tests use temp homes; NeverTouchesRealHomes self-skips because a real install exists"
+    },
+    {
+      "item": "phase-8 git push through the pre-push hook with a genuine approval",
+      "reason": "covered only by gate_decision and fake-approval tests"
+    },
+    {
+      "item": "mutation checks",
+      "reason": "not run by operator policy"
+    }
+  ],
+  "findings": {
+    "open_blocker": 0,
+    "open_major": 0
+  },
+  "reviewers": [
+    {
+      "role": "functional-test-reviewer",
+      "model": "sonnet",
+      "effort": "medium",
+      "verdict": "suite green 322/323, 1 self-skip, no open product bugs"
+    }
+  ]
+}
+
+
+## Evidence file: verify-evidence.md (sha256 745af71b727f80617400f308e6f04d8cec1731bf43058981d992486b78cec091)
+# Verify evidence - Agentic_Framework
+
+Machine-readable evidence: `docs/sdlc/verify-evidence.json` (validated by tools/af/evidence.py before a review is sent).
+
+## Test evidence
+Tested head 75ee95ba2996c5fbda483042d53f5b9304467575: `python -m unittest discover -s tests -v` = 338 tests, 337 OK, 0 failed, 0 errors, 1 self-skip (guard that skips when the real home already has an install manifest), 1129 s, run by the functional-test-reviewer agent on exactly this tree.
+
+## History of the review
+- Round 1 (head 9befa56): MAJOR x3, MINOR x2 - remediated (change 0005).
+- Round 2 (7728951): MAJOR x2 - remediated (change 0006).
+- Round 3 (4dcd4ba): APPROVE.
+- Root commit 20c0098 reviewed separately: MAJOR x4, MINOR x2 - remediated (change 0007).
+- Round 5 (5ee25f9): MAJOR - zero-pass runs accepted as evidence; remediated (change 0011).
+- Round 6 (28b6830): MINOR - stale Markdown summary only; corrected in the following commit.
+- Round 4 (b9b4fe1): MAJOR x2 left open (heading-only evidence, mtime freshness) plus input-hash correspondence - closed by this change set (change 0009): structured evidence, sprint-bound artifacts with digests, pre-computed prompt hash comparison.
+
+## NOT_RUN
+See the not_run list in verify-evidence.json (real PM Bridge dump mode, real schtasks/registry, installs into real homes, phase-8 push through the pre-push hook with a genuine approval, mutation checks).
+
+## Known gaps
+- Approval files are guarded by tooling and digests, not cryptography.
+- Text-based push detection is best effort; the git pre-push hook is the boundary.
+- `status` does not yet print the exact artifact requirements (backlog item 1).
+
+Findings outside that scope are still welcome, but mark them explicitly as out-of-scope and do NOT let them set the VERDICT line: the verdict must answer the scoped question. If the scoped question is genuinely satisfied, say APPROVE even when out-of-scope work remains -- an unrelated open item is not a reason to withhold a verdict on this one.
+
+Reply with a VERDICT line first (APPROVE, or BLOCKER/MAJOR/MINOR findings), then each finding as: severity | claim | evidence | failure scenario | required change.
+
+Apply a devil's-advocate stance throughout: actively look for reasons this change is wrong, unsafe, incomplete, or will break something, rather than defaulting to approval. This does not license inventing problems that aren't real: every objection still needs the same real file/line evidence required above -- if after genuinely trying to find a problem there is none, say so plainly rather than manufacturing a NIT to seem thorough.
+
+Diff:
+```diff
+diff --git a/core/DECISION_LOG.md b/core/DECISION_LOG.md
+index bbacb83..9ae9b31 100644
+--- a/core/DECISION_LOG.md
++++ b/core/DECISION_LOG.md
+@@ -10,6 +10,8 @@
+ - Decision: a verify-evidence run must contain at least one passing test (skipped tests are not evidence), and an empty reviewers list needs an explicit non-blank `reviewers_waived_reason`. Basis: GPT-PM round 5 MAJOR finding.
+ - Decision: the generated state view never overwrites an existing STATE.md that lacks the generated marker; it is written to AF_STATE.md instead. Basis: the framework overwrote a tracked docs/sdlc/STATE.md in another project.
+ - Evidence: full suite 338 tests, 337 OK, 1 skipped, 0 failures (test agent log full14.log). See docs/changes/0011-zero-pass-evidence-and-foreign-state-view.md.
++- Evidence file now points tested_head at 75ee95b (338 total, 337 passed, 1 skipped) and passes evidence.validate; round 6 PM-GPT review is requested on that basis.
++- Round 6 PM-GPT on 28b6830: MINOR, no blocking findings; only the stale verify-evidence.md summary. Corrected; a verification review of the corrected head is requested because the gate needs APPROVE bound to the exact HEAD.
+ - Planned and recorded, not done here: sync core agents with the operator's installed versions; import connector-free ADK skills (they need rewriting, since they reference Agentic Studio internals).
+ 
+ ## 2026-10-28 - Import of the operator's agents and skills, /af toggle, push-gate fix
+diff --git a/core/LESSONS_LOG.md b/core/LESSONS_LOG.md
+index c36ee2b..9e81438 100644
+--- a/core/LESSONS_LOG.md
++++ b/core/LESSONS_LOG.md
+@@ -1,5 +1,6 @@
+ # Lessons log (append-only)
+ 
++- 2026-10-29 round 6 summary fix - SHORTCOMING (author): updated verify-evidence.json but left the human-readable verify-evidence.md pointing at the old head and counts; GPT-PM round 6 returned MINOR for it. Rule: when evidence is updated, update every view of it in the same commit (or generate the Markdown from the JSON).
+ - 2026-10-29 zero-pass evidence and foreign state view - FAILURE (author, tests): the evidence validator accepted runs with zero passing tests (GPT-PM round 5, MAJOR), and the state writer overwrote a tracked STATE.md in another project. Evidence: round 5 verdict; the other project's git diff. Root cause: validated count consistency but not the property "something passed"; assumed STATE.md is ours. Caught by the external gate and by the operator, not by tests. Rule: validate the property the evidence must prove; never write a generated file over an existing file we did not create.
+ - 2026-10-29 activation context repair - FAILURE (observed CLI behavior): `on` confirmed activation without printing the phase instructions required by core/commands/af.md. The current session initially stopped at that output. Rule: print the canonical phase context from successful CLI activation; do not depend on a client-specific hook to deliver the next action.
+ 
+diff --git a/docs/sdlc/verify-evidence.json b/docs/sdlc/verify-evidence.json
+index 54c083a..65a0b36 100644
+--- a/docs/sdlc/verify-evidence.json
++++ b/docs/sdlc/verify-evidence.json
+@@ -1,14 +1,14 @@
+ {
+-  "tested_head": "2d6743dc6e0db7f9967a3c2b526a4884f088a4b3",
++  "tested_head": "75ee95ba2996c5fbda483042d53f5b9304467575",
+   "runs": [
+     {
+       "command": "python -m unittest discover -s tests -v",
+-      "total": 323,
+-      "passed": 322,
++      "total": 338,
++      "passed": 337,
+       "failed": 0,
+       "errors": 0,
+       "skipped": 1,
+-      "log": "full12.log (799 s)"
++      "log": "full14.log (1129 s)"
+     }
+   ],
+   "not_run": [
+diff --git a/docs/sdlc/verify-evidence.md b/docs/sdlc/verify-evidence.md
+index bd98852..aeb6c71 100644
+--- a/docs/sdlc/verify-evidence.md
++++ b/docs/sdlc/verify-evidence.md
+@@ -3,13 +3,15 @@
+ Machine-readable evidence: `docs/sdlc/verify-evidence.json` (validated by tools/af/evidence.py before a review is sent).
+ 
+ ## Test evidence
+-Tested head 2d6743dc6e0db7f9967a3c2b526a4884f088a4b3: `python -m unittest discover -s tests -v` = 323 tests, 322 OK, 0 failed, 0 errors, 1 self-skip (guard that skips when the real home already has an install manifest), 799 s, run by the functional-test-reviewer agent on exactly this tree.
++Tested head 75ee95ba2996c5fbda483042d53f5b9304467575: `python -m unittest discover -s tests -v` = 338 tests, 337 OK, 0 failed, 0 errors, 1 self-skip (guard that skips when the real home already has an install manifest), 1129 s, run by the functional-test-reviewer agent on exactly this tree.
+ 
+ ## History of the review
+ - Round 1 (head 9befa56): MAJOR x3, MINOR x2 - remediated (change 0005).
+ - Round 2 (7728951): MAJOR x2 - remediated (change 0006).
+ - Round 3 (4dcd4ba): APPROVE.
+ - Root commit 20c0098 reviewed separately: MAJOR x4, MINOR x2 - remediated (change 0007).
++- Round 5 (5ee25f9): MAJOR - zero-pass runs accepted as evidence; remediated (change 0011).
++- Round 6 (28b6830): MINOR - stale Markdown summary only; corrected in the following commit.
+ - Round 4 (b9b4fe1): MAJOR x2 left open (heading-only evidence, mtime freshness) plus input-hash correspondence - closed by this change set (change 0009): structured evidence, sprint-bound artifacts with digests, pre-computed prompt hash comparison.
+ 
+ ## NOT_RUN
+
+```
+
+---
+
+EXECUTION AUTHORITY
+
+GO: AUTHORIZED
+PUSH: AUTHORIZED under the current Gate policy.
+
+Do not stop for routine approval.
+Do not bypass platform-enforced confirmations or security controls.
+
+REVIEW POLICY:
+Find the full BLOCKER/MAJOR set in one adversarial sweep.
+Do not issue one finding per review round.
+After remediation, verify only reported findings and direct regressions.
+Unrelated improvements go to ROADMAP, not back into the current Gate.
+
+CI THAT NEVER RAN:
+If a required GitHub check did not execute (steps: [], or a billing/spending-limit/runner annotation),
+a green local Docker/act run of the same workflow on the same head SHA counts as that check passing.
+Given that evidence, APPROVE the PR; Claude merges it with an admin merge that passes over only those
+non-executed checks. A check that ran and failed on the code is still a real failure.
+
+ESCALATION:
+Resolve technical disagreements internally for up to 5 evidence-based rounds.
+Escalate to CEO only when a real business/irreversible decision remains unresolved.
