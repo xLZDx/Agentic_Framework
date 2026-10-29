@@ -2,19 +2,24 @@
 
 `request` sends the exact committed range to PM Bridge (`review.js --final`), accepts only a
 correlated, concluding APPROVE, and binds the approval to the git HEAD that was reviewed.
-`verify` is the mechanical push gate: it passes only while HEAD still equals the approved head.
+Before sending it validates the structured evidence (tools/af/evidence.py), the sprint artifacts and
+the review base, and it pre-computes the exact prompt PM Bridge will send (review.js is
+deterministic and has a prompt-dump mode) so the returned `reviewInputHash` can be compared with it.
+`verify` is the mechanical push gate: it passes only while HEAD, the artifacts and the approval agree.
 The same tool serves Claude and GPT/Codex sessions; the approval is tool-agnostic.
 """
 from __future__ import annotations
 
 import hashlib
 import json
+import os
 import subprocess
 from pathlib import Path
 
-from . import core
+from . import core, evidence
 
 KINDS = ("code", "docs")
+DIFF_OPEN = "Diff:\n```diff\n"
 
 
 def _paths(project: Path, kind: str) -> tuple[Path, Path]:
@@ -23,6 +28,10 @@ def _paths(project: Path, kind: str) -> tuple[Path, Path]:
     if kind == "code":
         return pm / "approval.json", sd / core.load_phase_map()["push_gate"]["approval_file"]
     return pm / "approval-docs.json", sd / "docs-approval.md"
+
+
+def _sha(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
 
 
 def build_packet(project: Path, kind: str, base: str, head_sha: str) -> str:
@@ -36,12 +45,12 @@ def build_packet(project: Path, kind: str, base: str, head_sha: str) -> str:
         "`SEVERITY | basis | claim | evidence | required change`.",
         "Approve only if the exact head is safe to push. Verify claims against the diff.",
     ]
-    for name in ("verify-evidence.md", "review-record.md", "test-plan.md", "requirements.md", "backlog.md", "design.md"):
+    names = ["verify-evidence.json", "verify-evidence.md", "review-record.md", "test-plan.md",
+             "requirements.md", "backlog.md", "design.md"]
+    for name in names:
         f = sd / name
         if f.is_file():
-            parts.append(f"\n## Evidence file: {name}\n{f.read_text(encoding='utf-8', errors='replace')}")
-        elif kind == "code" and name == "verify-evidence.md":
-            parts.append("\n## Evidence file: verify-evidence.md\nMISSING (treat all verification as NOT_RUN)")
+            parts.append(f"\n## Evidence file: {name} (sha256 {_sha(f.read_bytes())})\n{f.read_text(encoding='utf-8', errors='replace')}")
     return "\n".join(parts)
 
 
@@ -63,17 +72,20 @@ def _accept(result: dict) -> tuple[bool, str]:
     return True, "ok"
 
 
-EVIDENCE_HEADINGS = ("## Test evidence", "## NOT_RUN")
-
-
 def _preflight(project: Path, kind: str, base: str, head_sha: str) -> str | None:
-    """Reject incomplete evidence and review ranges that do not cover the sprint."""
+    """Reject incomplete evidence, unstamped artifacts and review ranges that do not cover the sprint."""
     if kind == "code":
-        ev = core.state_dir(project) / "verify-evidence.md"
-        text = ev.read_text(encoding="utf-8", errors="replace") if ev.is_file() else ""
-        missing = [h for h in EVIDENCE_HEADINGS if h not in text]
-        if missing:
-            return f"verify-evidence.md is missing or lacks required sections {missing}; produce the phase-7 evidence first."
+        problems = evidence.validate(project, head_sha)
+        if problems:
+            return "verify-evidence.json is not acceptable: " + "; ".join(problems)
+        st = core.read_state(project)
+        if st:
+            if not st.get("sprint_id"):
+                return "legacy sprint state without sprint_id; run `af_cli.py migrate` and re-stamp the artifacts"
+            for n in range(1, 8):
+                miss = core.missing_artifacts(project, n)
+                if miss:
+                    return f"phase {n} artifacts missing or not stamped with sprint id {st['sprint_id']}: {', '.join(miss)}"
     try:
         base_sha = core.git(project, "rev-parse", "--verify", f"{base}^{{commit}}").strip()
     except RuntimeError as exc:
@@ -81,8 +93,7 @@ def _preflight(project: Path, kind: str, base: str, head_sha: str) -> str | None
     anc = subprocess.run(["git", "-C", str(project), "merge-base", "--is-ancestor", base_sha, head_sha])
     if anc.returncode != 0:
         return f"base {base_sha[:12]} is not an ancestor of HEAD"
-    st = core.read_state(project) or {}
-    start = st.get("start_head")
+    start = (core.read_state(project) or {}).get("start_head")
     if kind == "code" and start:
         cov = subprocess.run(["git", "-C", str(project), "merge-base", "--is-ancestor", base_sha, start])
         if cov.returncode != 0:
@@ -91,6 +102,22 @@ def _preflight(project: Path, kind: str, base: str, head_sha: str) -> str | None
     if subprocess.run(["git", "-C", str(project), "diff", "--quiet", f"{base_sha}...{head_sha}"]).returncode == 0:
         return "the review range is empty"
     return None
+
+
+def _review_cmd(node: str, review_js: Path, project: Path, base: str, packet: Path, project_id: str | None) -> list[str]:
+    cmd = [node, str(review_js), "--cwd", str(project), "--base", base, "--final", "--scope-note-file", str(packet)]
+    if project_id:
+        cmd += ["--project", project_id]
+    return cmd
+
+
+def _expected_prompt(cmd: list[str], dump: Path) -> str | None:
+    """Ask review.js for the exact prompt it will send (dump-only mode: no browser, no receipt)."""
+    env = dict(os.environ, PM_BRIDGE_DEBUG_DUMP_PROMPT=str(dump), PM_BRIDGE_DEBUG_DUMP_PROMPT_ONLY="1")
+    if dump.exists():
+        dump.unlink()
+    subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False, env=env)
+    return dump.read_bytes().decode("utf-8") if dump.is_file() else None
 
 
 def request(project: Path, kind: str, base: str, node: str = "node", project_id: str | None = None) -> int:
@@ -113,10 +140,22 @@ def request(project: Path, kind: str, base: str, node: str = "node", project_id:
     pm_dir = sd / ".pm-review"
     pm_dir.mkdir(parents=True, exist_ok=True)
     packet = pm_dir / f"packet-{kind}-{head_sha[:12]}.md"
-    packet.write_text(build_packet(project, kind, base, head_sha), encoding="utf-8")
-    cmd = [node, str(review_js), "--cwd", str(project), "--base", base, "--final", "--scope-note-file", str(packet)]
-    if project_id:
-        cmd += ["--project", project_id]
+    packet.write_bytes(build_packet(project, kind, base, head_sha).encode("utf-8"))  # LF bytes, no newline translation
+    cmd = _review_cmd(node, review_js, project, base, packet, project_id)
+
+    prompt = _expected_prompt(cmd, pm_dir / f"prompt-{kind}-{head_sha[:12]}.txt")
+    if prompt is None:
+        print("REFUSED: could not pre-compute the review prompt (review.js dump mode unavailable); "
+              "the returned input hash could not be bound. No review sent.")
+        return 2
+    packet_text = packet.read_bytes().decode("utf-8")
+    if packet_text.strip() not in prompt or head_sha not in prompt:
+        print("REFUSED: the pre-computed prompt does not contain the evidence packet and the exact head.")
+        return 2
+    expected_hash = _sha(prompt.encode("utf-8"))
+    cut = prompt.find(DIFF_OPEN)
+    diff_in_prompt = prompt[cut + len(DIFF_OPEN):] if cut >= 0 else ""
+
     proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)
     try:
         result = json.loads(proc.stdout.strip().splitlines()[-1])
@@ -131,20 +170,29 @@ def request(project: Path, kind: str, base: str, node: str = "node", project_id:
     if not ok:
         print(f"NOT_APPROVED: {why}. Verdict={result.get('verdict')}.\n--- reply ---\n{(result.get('reply') or '')[:6000]}")
         return 1
+    if result.get("reviewInputHash") != expected_hash:
+        print(f"NOT_APPROVED: reviewInputHash {result.get('reviewInputHash')} does not match the pre-computed "
+              f"prompt hash {expected_hash}; the reviewed input is not the one we prepared.")
+        return 1
+    base_sha = core.git(project, "rev-parse", f"{base}^{{commit}}").strip()
+    ev_json = sd / evidence.FILE
     approval = {
         "approval_id": f"PMG-{core.now_iso()[:10].replace('-', '')}-{head_sha[:8]}",
         "kind": kind,
         "head": head_sha,
         "base": base,
+        "base_sha": base_sha,
         "verdict": result["verdict"],
         "request_id": result["reviewRequestId"],
         "reply_id": result["replyId"],
-        "input_hash": result.get("reviewInputHash"),
-        "base_sha": core.git(project, "rev-parse", f"{base}^{{commit}}").strip(),
-        "diff_sha256": hashlib.sha256(core.git(project, "diff", f"{base}...{head_sha}").encode("utf-8", "replace")).hexdigest(),
-        "evidence_sha256": hashlib.sha256((core.state_dir(project) / "verify-evidence.md").read_bytes()).hexdigest()
-        if (core.state_dir(project) / "verify-evidence.md").is_file() else None,
-        "reply_sha256": hashlib.sha256((result.get("reply") or "").encode("utf-8")).hexdigest(),
+        "input_hash": result["reviewInputHash"],
+        "expected_input_hash": expected_hash,
+        "diff_sha256": _sha(core.git(project, "diff", f"{base_sha}...{head_sha}").encode("utf-8", "replace")),
+        "diff_in_prompt_sha256": _sha(diff_in_prompt.encode("utf-8")),
+        "evidence_sha256": _sha(ev_json.read_bytes()) if ev_json.is_file() else None,
+        "sprint_id": (core.read_state(project) or {}).get("sprint_id"),
+        "artifacts": core.artifact_digests(project) if kind == "code" else {},
+        "reply_sha256": _sha((result.get("reply") or "").encode("utf-8")),
         "recorded": core.now_iso(),
         "reviewer": "GPT-PM via PM Bridge review.js",
     }
@@ -154,7 +202,9 @@ def request(project: Path, kind: str, base: str, node: str = "node", project_id:
         "# PM-GPT approval\n\n"
         f"Approval id: {approval['approval_id']}\nHead: {approval['head']}\nKind: {kind}\n"
         f"Verdict: {approval['verdict']}\nRequest id: {approval['request_id']}\nReply id: {approval['reply_id']}\n"
-        f"Recorded: {approval['recorded']}\n\nGenerated by tools/af_cli.py pm-review. Do not edit by hand.\n",
+        f"Recorded: {approval['recorded']}\n"
+        + (f"Sprint: {approval['sprint_id']}\n" if approval["sprint_id"] else "")
+        + "\nGenerated by tools/af_cli.py pm-review. Do not edit by hand.\n",
         encoding="utf-8",
     )
     print(f"APPROVED: {approval['approval_id']} head={head_sha}")
@@ -175,6 +225,12 @@ def verify(project: Path, kind: str = "code") -> tuple[bool, str]:
         return False, "approval lacks correlated ids"
     if not mpath.is_file() or a["head"] not in mpath.read_text(encoding="utf-8"):
         return False, f"{mpath.name} missing or does not match approval.json"
+    recorded = a.get("artifacts") or {}
+    if recorded:
+        now = core.artifact_digests(project)
+        changed = sorted(k for k in set(recorded) | set(now) if recorded.get(k) != now.get(k))
+        if changed:
+            return False, f"artifacts changed after the approval: {', '.join(changed[:5])}"
     dirty = core.tracked_dirty(project)
     if dirty:
         return False, "tracked changes are uncommitted after the approval"

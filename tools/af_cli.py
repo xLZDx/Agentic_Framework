@@ -17,7 +17,11 @@ from af import core, pm_review  # noqa: E402
 
 
 def _project(args) -> Path:
-    return core.git_root(Path(args.project or "."))
+    try:
+        return core.git_root(Path(args.project or "."))
+    except RuntimeError:
+        raise SystemExit(f"Not inside a git repository ({Path(args.project or '.').resolve()}). "
+                         "Run from the project folder or pass --project <repo>.")
 
 
 def cmd_status(args) -> int:
@@ -28,6 +32,7 @@ def cmd_status(args) -> int:
         return 0
     n = st["phase"]
     d = core.phase_def(n)
+    print(f"Sprint id: {st.get('sprint_id') or '(legacy: run migrate)'}  (artifacts must contain `Sprint: <id>`)")
     print(f"Sprint: {st.get('title')}  Phase: {n} {d['name']}  Mode: {st.get('mode')}  Paused: {bool(st.get('paused'))}")
     print(f"Roles to launch: {', '.join(d['roles']) or '(PM-GPT via pm-gpt-review)'}")
     print(f"Skills: {', '.join(d['skills'])}")
@@ -68,6 +73,10 @@ def cmd_next(args) -> int:
     if not st:
         print("No sprint.")
         return 1
+    if not st.get("sprint_id"):
+        print("BLOCKED: legacy sprint state without sprint_id. Run `af_cli.py migrate`, then stamp each artifact "
+              "with the printed `Sprint: <id>` line.")
+        return 1
     n = st["phase"]
     miss = core.missing_artifacts(p, n)
     if miss and not args.force:
@@ -82,7 +91,8 @@ def cmd_next(args) -> int:
     if n >= 10:
         print("Already at the last phase.")
         return 0
-    st["history"].append({"phase": n, "left": core.now_iso(), "head": core.head(p), "forced": bool(args.force)})
+    st["history"].append({"phase": n, "left": core.now_iso(), "head": core.head(p), "forced": bool(args.force),
+                          "artifacts": core.artifact_digests(p, n)})
     st["phase"] = n + 1
     core.write_state(p, st)
     print(f"Advanced to phase {n + 1} {core.phase_def(n + 1)['name']}")
@@ -116,6 +126,21 @@ def cmd_on(args) -> int:
     st["mode"] = mode
     core.write_state(p, st)
     print(f"Framework ON: resumed at phase {st['phase']} ({st['mode']}) in {p}")
+    return 0
+
+
+def cmd_migrate(args) -> int:
+    p = _project(args)
+    st = core.read_state(p)
+    if not st:
+        print("No sprint.")
+        return 1
+    if st.get("sprint_id"):
+        print(f"Already migrated: Sprint: {st['sprint_id']}")
+        return 0
+    st["sprint_id"] = core.new_sprint_state(p, st.get("title", ""), st.get("mode", "hard"))["sprint_id"]
+    core.write_state(p, st)
+    print(f"Migrated. Stamp every phase artifact with the line: Sprint: {st['sprint_id']}")
     return 0
 
 
@@ -200,6 +225,7 @@ def main(argv=None) -> int:
     sub.add_parser("resume").set_defaults(fn=lambda a: _set(a, paused=False))
     s = sub.add_parser("on"); s.add_argument("--mode", default=None, choices=["hard", "soft"]); s.add_argument("--title", default="Sprint"); s.set_defaults(fn=cmd_on)
     sub.add_parser("off").set_defaults(fn=cmd_off)
+    sub.add_parser("migrate").set_defaults(fn=cmd_migrate)
     s = sub.add_parser("pm-review"); s.add_argument("--kind", choices=list(pm_review.KINDS), default="code"); s.add_argument("--base", required=True); s.add_argument("--node", default="node"); s.add_argument("--project-id"); s.set_defaults(fn=cmd_pm_review)
     s = sub.add_parser("verify"); s.add_argument("--kind", choices=list(pm_review.KINDS), default="code"); s.set_defaults(fn=cmd_verify)
     sub.add_parser("hook").set_defaults(fn=cmd_hook)

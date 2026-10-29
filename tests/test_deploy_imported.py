@@ -166,10 +166,11 @@ class SkillsAndCommand(unittest.TestCase):
         self.assertNotIn("af", SKILLS)
         self.assertFalse((DEPLOY / "codex" / "skills" / "af").exists())
 
-    def test_codex_prompt_has_arguments_placeholder(self):
+    def test_codex_prompt_has_no_arguments_placeholder(self):
         f = DEPLOY / "codex" / "prompts" / "af.md"
         text = f.read_text(encoding="utf-8")
-        self.assertIn("$ARGUMENTS", text)
+        self.assertNotIn("$ARGUMENTS", text)  # Codex appends the typed arguments itself
+        self.assertNotIn("Arguments: $", text)
         m = re.match(r"\A---\n(.*?)\n---\n", text, re.S)
         self.assertTrue(m)
         self.assertIn("description:", m.group(1))

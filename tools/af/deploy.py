@@ -95,7 +95,7 @@ def build(clean: bool = True) -> list[str]:
             (out / "prompts").mkdir(parents=True, exist_ok=True)
             head = ["---", f"description: {json.dumps(desc)}", "argument-hint: on|off|status|next|verify", "---", ""]
             (out / "prompts" / "af.md").write_text(
-                NL.join(head) + NL + af_cmd + NL + "Arguments: $ARGUMENTS" + NL, encoding="utf-8")
+                NL.join(head) + NL + af_cmd, encoding="utf-8")  # Codex appends the typed arguments itself
             written.append("deploy/codex/prompts/af.md")
         shutil.copy(ROOT / "core" / "orchestration" / "phase-map.json", out / "phase-map.json")
         written.append(str((out / "phase-map.json").relative_to(ROOT)))

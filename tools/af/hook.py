@@ -136,7 +136,8 @@ def context_line(project: Path) -> str | None:
     p = core.phase_def(n)
     miss = core.missing_artifacts(project, n)
     roles = ", ".join(p["roles"]) or "PM-GPT via skill pm-gpt-review"
-    return (f"[Agentic_Framework SDLC] sprint '{state.get('title', '')}' phase {n} {p['name']}. "
+    return (f"[Agentic_Framework SDLC] sprint '{state.get('title', '')}' (id {state.get('sprint_id') or 'legacy'}; "
+            f"every phase artifact must contain the line `Sprint: <id>`) phase {n} {p['name']}. "
             f"Missing exit artifacts: {', '.join(miss) or 'none'}. Launch as real agents: {roles}. "
             f"Skills: {', '.join(p['skills'])}. Advance with af_cli.py next; never self-approve phase 8.")
 

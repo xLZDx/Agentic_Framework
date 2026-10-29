@@ -97,16 +97,14 @@ class Verify(unittest.TestCase):
         self.assertTrue(r.stdout.startswith("OK"))
 
 
-GOOD_EVIDENCE = chr(10).join(["# Evidence", "", "## Test evidence", "all green", "", "## NOT_RUN", "nothing", ""])
-
-
 @unittest.skipUnless(NODE, "NOT_RUN: node is not available; fake review.js cannot be executed")
 class Request(unittest.TestCase):
     def setUp(self):
         self.repo = H.make_repo(self)
         H.commit_file(self.repo, "a.txt")
         H.set_state(self.repo, phase=8)
-        H.write_artifact(self.repo, "verify-evidence.md", GOOD_EVIDENCE)
+        H.stamp_phases_1_7(self.repo)
+        H.write_evidence(self.repo)
         self.base = H.first_commit(self.repo)
         self.tools = H.tmpdir(self)
         (self.tools / "review.js").write_text(H.FAKE_REVIEW_JS, encoding="utf-8")
@@ -141,7 +139,7 @@ class Request(unittest.TestCase):
         self.assertEqual(a["head"], head)
         self.assertEqual(a["base"], self.base)
         self.assertEqual(a["verdict"], "APPROVE")
-        self.assertEqual((a["request_id"], a["reply_id"], a["input_hash"]), ("req-1", "reply-1", "hash-1"))
+        self.assertEqual((a["request_id"], a["reply_id"], a["input_hash"]), ("req-1", "reply-1", a["expected_input_hash"]))
         self.assertEqual(a["reply_sha256"], hashlib.sha256(APPROVE["reply"].encode()).hexdigest())
         self.assertIn(head, m.read_text(encoding="utf-8"))
         ok, why = pm_review.verify(self.repo)
@@ -151,7 +149,7 @@ class Request(unittest.TestCase):
         self.assertFalse(pm_review.verify(self.repo)[0])
 
     def test_request_passes_exact_range_and_packet_to_review_js(self):
-        H.write_artifact(self.repo, "verify-evidence.md", GOOD_EVIDENCE + "EVIDENCE-MARKER")
+        H.write_evidence(self.repo, not_run=[{"item": "EVIDENCE-MARKER", "reason": "r"}])
         rc, out = self.run_request()
         self.assertEqual(rc, 0, out)
         argv = json.loads((self.tools / "argv.json").read_text(encoding="utf-8"))
@@ -163,7 +161,7 @@ class Request(unittest.TestCase):
         self.assertIn("EVIDENCE-MARKER", packet)
 
     def test_missing_verify_evidence_is_refused_for_code(self):
-        (H.sdlc(self.repo) / "verify-evidence.md").unlink()
+        (H.sdlc(self.repo) / "verify-evidence.json").unlink()
         rc, out = self.run_request()
         self.assertEqual(rc, 2)
         self.assertIn("REFUSED", out)
@@ -209,7 +207,8 @@ class Request(unittest.TestCase):
                 repo = H.make_repo(self)
                 H.commit_file(repo, "a.txt")
                 H.set_state(repo, phase=8)
-                H.write_artifact(repo, "verify-evidence.md", GOOD_EVIDENCE)
+                H.stamp_phases_1_7(repo)
+                H.write_evidence(repo)
                 result = copy.deepcopy(APPROVE)
                 result.update(patch)
                 rc, out = self.run_request(result, repo=repo)
@@ -223,6 +222,7 @@ class Request(unittest.TestCase):
     def test_rejection_does_not_clobber_existing_valid_approval_for_other_head(self):
         self.run_request()
         H.commit_file(self.repo, "c.txt")
+        H.write_evidence(self.repo)
         bad = dict(APPROVE, verdict="MINOR")
         rc, _ = self.run_request(bad)
         self.assertEqual(rc, 1)
@@ -287,6 +287,7 @@ class Request(unittest.TestCase):
         cfg["result"] = dict(APPROVE, verdict="MAJOR")
         (self.tools / "cfg.json").write_text(json.dumps(cfg), encoding="utf-8")
         H.commit_file(self.repo, "z.txt")
+        H.write_evidence(self.repo)
         r = H.run_cli(self.repo, "pm-review", "--base", self.base, env=env)
         self.assertEqual(r.returncode, 1)
 

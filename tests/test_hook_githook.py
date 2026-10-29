@@ -172,7 +172,9 @@ class HookMain(unittest.TestCase):
                 out = json.loads(r.stdout)["hookSpecificOutput"]
                 self.assertEqual(out["hookEventName"], name)
                 ctx = out["additionalContext"]
-                self.assertIn("sprint 'Alpha' phase 1 Discovery", ctx)
+                self.assertIn("sprint 'Alpha'", ctx)
+                self.assertIn("phase 1 Discovery", ctx)
+                self.assertIn("id " + H.TEST_SID, ctx)
                 self.assertIn("Missing exit artifacts: requirements.md", ctx)
                 self.assertIn("business-analyst", ctx)
 

@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import glob
+import hashlib
 import json
 import os
 import subprocess
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -70,27 +72,46 @@ def write_state(project: Path, state: dict) -> None:
     (d / "STATE.md").write_text(render_state_md(project, state), encoding="utf-8")
 
 
-def artifact_present(project: Path, pattern: str, since: float | None = None) -> bool:
-    """An artifact counts only if it exists and (when `since` is given) was written after the sprint started."""
+def artifact_present(project: Path, pattern: str, sprint_id: str | None = None) -> bool:
+    """An artifact counts when it exists and, for a state with a sprint id, carries that id in its text."""
     for f in glob.glob(str(state_dir(project) / pattern)):
-        if since is None or os.path.getmtime(f) >= since:
+        if not os.path.isfile(f):
+            continue
+        if sprint_id is None:
             return True
+        try:
+            if sprint_id in open(f, encoding="utf-8", errors="replace").read():
+                return True
+        except OSError:
+            continue
     return False
 
 
 def missing_artifacts(project: Path, n: int) -> list[str]:
-    st = read_state(project) or {}
-    since = st.get("started_epoch")
-    return [a for a in phase_def(n)["artifacts"] if not artifact_present(project, a, since)]
+    sid = (read_state(project) or {}).get("sprint_id")
+    return [a for a in phase_def(n)["artifacts"] if not artifact_present(project, a, sid)]
+
+
+def artifact_digests(project: Path, upto: int = 7) -> dict:
+    """sha256 of every artifact of phases 1..upto plus the structured evidence file (posix keys relative to state_dir)."""
+    root = state_dir(project)
+    out: dict = {}
+    pats = [a for n in range(1, upto + 1) for a in phase_def(n)["artifacts"]] + ["verify-evidence.json"]
+    for pat in pats:
+        for f in sorted(glob.glob(str(root / pat))):
+            if os.path.isfile(f):
+                out[Path(f).relative_to(root).as_posix()] = hashlib.sha256(Path(f).read_bytes()).hexdigest()
+    return out
 
 
 def new_sprint_state(project: Path, title: str, mode: str) -> dict:
-    """Initial state; remembers the start time and HEAD so stale artifacts and narrowed review bases are rejected."""
+    """Initial state with a sprint id (phase artifacts must carry it), the start time and HEAD."""
     try:
         start_head = head(project)
     except Exception:
         start_head = None
     return {"title": title, "phase": 1, "mode": mode, "paused": False, "history": [],
+            "sprint_id": uuid.uuid4().hex[:12],
             "started_epoch": datetime.now(timezone.utc).timestamp(), "start_head": start_head}
 
 

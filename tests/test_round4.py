@@ -13,7 +13,6 @@ import afhelpers as H
 from afhelpers import ROOT, core, deploy, pm_review, APPROVE
 
 NODE = shutil.which("node")
-GOOD = chr(10).join(["# Evidence", "", "## Test evidence", "all green", "", "## NOT_RUN", "nothing", ""])
 PAST = 1_000_000_000  # 2001: well before any sprint start
 
 
@@ -62,24 +61,6 @@ class StaleArtifacts(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stdout)
         self.assertEqual(state(self.repo)["phase"], 2)
         self.assertTrue(state(self.repo)["history"][-1]["forced"])
-
-    def test_glob_artifact_staleness_phase_6(self):
-        H.set_state(self.repo, phase=6)
-        st = state(self.repo)
-        st["started_epoch"] = 2_000_000_000.0  # far future start: anything on disk is older
-        core.write_state(self.repo, st)
-        H.write_artifact(self.repo, "change-records/c1.md")
-        self.assertEqual(core.missing_artifacts(self.repo, 6), ["change-records/*.md"])
-        st["started_epoch"] = PAST
-        core.write_state(self.repo, st)
-        self.assertEqual(core.missing_artifacts(self.repo, 6), [])
-
-    def test_legacy_state_without_started_epoch_keeps_old_behaviour(self):
-        H.write_artifact(self.repo, "requirements.md")
-        age(H.sdlc(self.repo) / "requirements.md")
-        H.set_state(self.repo, phase=1)  # helper writes a state without started_epoch
-        self.assertNotIn("started_epoch", state(self.repo))
-        self.assertEqual(core.missing_artifacts(self.repo, 1), [])
 
     def test_no_state_means_no_staleness_filter(self):
         H.write_artifact(self.repo, "requirements.md")
@@ -165,7 +146,8 @@ class Preflight(unittest.TestCase):
         self.first = H.first_commit(self.repo)
         H.commit_file(self.repo, "a.txt")
         H.set_state(self.repo, phase=8)
-        H.write_artifact(self.repo, "verify-evidence.md", GOOD)
+        H.stamp_phases_1_7(self.repo)
+        H.write_evidence(self.repo)
         self.tools = H.tmpdir(self)
         (self.tools / "review.js").write_text(H.FAKE_REVIEW_JS, encoding="utf-8")
         self.argv = self.tools / "argv.json"
@@ -193,21 +175,21 @@ class Preflight(unittest.TestCase):
         self.assertEqual(rc, 0, out)
 
     def test_evidence_file_missing(self):
-        (H.sdlc(self.repo) / "verify-evidence.md").unlink()
-        self.assert_refused(*self.request(), "verify-evidence.md")
+        (H.sdlc(self.repo) / "verify-evidence.json").unlink()
+        self.assert_refused(*self.request(), "verify-evidence.json")
 
-    def test_evidence_lacks_each_required_heading(self):
-        for drop in ("## Test evidence", "## NOT_RUN"):
-            with self.subTest(missing=drop):
-                H.write_artifact(self.repo, "verify-evidence.md", GOOD.replace(drop, "## Other"))
-                self.assert_refused(*self.request(), drop)
+    def test_evidence_invalid_sections(self):
+        for label, over in (("no_runs", {"runs": []}), ("open_major", {"findings": {"open_blocker": 0, "open_major": 1}})):
+            with self.subTest(case=label):
+                H.write_evidence(self.repo, **over)
+                self.assert_refused(*self.request(), "not acceptable")
 
-    def test_evidence_empty(self):
-        H.write_artifact(self.repo, "verify-evidence.md", "")
+    def test_evidence_empty_file(self):
+        (H.sdlc(self.repo) / "verify-evidence.json").write_text("", encoding="utf-8")
         self.assert_refused(*self.request())
 
     def test_docs_kind_does_not_need_evidence(self):
-        (H.sdlc(self.repo) / "verify-evidence.md").unlink()
+        (H.sdlc(self.repo) / "verify-evidence.json").unlink()
         rc, out = self.request(kind="docs")
         self.assertEqual(rc, 0, out)
 
@@ -224,6 +206,7 @@ class Preflight(unittest.TestCase):
         start = core.head(self.repo)
         mid = H.commit_file(self.repo, "mid.txt")
         H.commit_file(self.repo, "late.txt")
+        H.write_evidence(self.repo)
         st = state(self.repo)
         st["start_head"] = start
         core.write_state(self.repo, st)
@@ -232,6 +215,7 @@ class Preflight(unittest.TestCase):
     def test_base_at_or_before_start_head_is_accepted(self):
         start = core.head(self.repo)
         H.commit_file(self.repo, "work.txt")
+        H.write_evidence(self.repo)
         st = state(self.repo)
         st["start_head"] = start
         core.write_state(self.repo, st)
@@ -261,7 +245,7 @@ class Preflight(unittest.TestCase):
         self.assertEqual(a["base_sha"], self.first)
         diff = H.git(self.repo, "diff", f"{self.first}...{head}")
         self.assertEqual(a["diff_sha256"], hashlib.sha256(diff.encode("utf-8")).hexdigest())
-        ev = (H.sdlc(self.repo) / "verify-evidence.md").read_bytes()
+        ev = (H.sdlc(self.repo) / "verify-evidence.json").read_bytes()
         self.assertEqual(a["evidence_sha256"], hashlib.sha256(ev).hexdigest())
         self.assertTrue(pm_review.verify(self.repo)[0])
 
@@ -270,7 +254,7 @@ class Preflight(unittest.TestCase):
         p = H.sdlc(self.repo) / ".pm-review" / "approval.json"
         a1 = json.loads(p.read_text(encoding="utf-8"))
         H.commit_file(self.repo, "more.txt")
-        H.write_artifact(self.repo, "verify-evidence.md", GOOD + "extra line" + chr(10))
+        H.write_evidence(self.repo, not_run=[{"item": "extra", "reason": "r"}])
         self.request()
         a2 = json.loads(p.read_text(encoding="utf-8"))
         self.assertNotEqual(a1["diff_sha256"], a2["diff_sha256"])
@@ -278,7 +262,7 @@ class Preflight(unittest.TestCase):
         self.assertEqual(a1["base_sha"], a2["base_sha"])
 
     def test_cli_refuses_with_exit_2_without_evidence(self):
-        (H.sdlc(self.repo) / "verify-evidence.md").unlink()
+        (H.sdlc(self.repo) / "verify-evidence.json").unlink()
         cfg = {"result": APPROVE, "argv_out": str(self.argv), "packet_out": str(self.tools / "packet.md")}
         (self.tools / "cfg.json").write_text(json.dumps(cfg), encoding="utf-8")
         r = H.run_cli(self.repo, "pm-review", "--kind", "code", "--base", self.first,

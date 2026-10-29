@@ -70,7 +70,7 @@ class FirstInstall(InstallBase):
             self.assertTrue((self.cx / "skills" / s / "SKILL.md").is_file(), s)
         self.assertTrue((self.ch / "skills" / "af" / "SKILL.md").is_file())
         self.assertTrue((self.cx / "prompts" / "af.md").is_file())
-        self.assertIn("$ARGUMENTS", (self.cx / "prompts" / "af.md").read_text(encoding="utf-8"))
+        self.assertNotIn("$ARGUMENTS", (self.cx / "prompts" / "af.md").read_text(encoding="utf-8"))  # Codex appends typed args itself
         self.assertTrue((self.ch / "af-install-manifest.json").is_file())
         self.assertTrue((self.cx / "af-install-manifest.json").is_file())
 
