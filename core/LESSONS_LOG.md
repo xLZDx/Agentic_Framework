@@ -1,5 +1,6 @@
 # Lessons log (append-only)
 
+- 2026-10-29 round 6 summary fix - SHORTCOMING (author): updated verify-evidence.json but left the human-readable verify-evidence.md pointing at the old head and counts; GPT-PM round 6 returned MINOR for it. Rule: when evidence is updated, update every view of it in the same commit (or generate the Markdown from the JSON).
 - 2026-10-29 zero-pass evidence and foreign state view - FAILURE (author, tests): the evidence validator accepted runs with zero passing tests (GPT-PM round 5, MAJOR), and the state writer overwrote a tracked STATE.md in another project. Evidence: round 5 verdict; the other project's git diff. Root cause: validated count consistency but not the property "something passed"; assumed STATE.md is ours. Caught by the external gate and by the operator, not by tests. Rule: validate the property the evidence must prove; never write a generated file over an existing file we did not create.
 - 2026-10-29 activation context repair - FAILURE (observed CLI behavior): `on` confirmed activation without printing the phase instructions required by core/commands/af.md. The current session initially stopped at that output. Rule: print the canonical phase context from successful CLI activation; do not depend on a client-specific hook to deliver the next action.
 

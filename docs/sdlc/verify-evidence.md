@@ -3,13 +3,15 @@
 Machine-readable evidence: `docs/sdlc/verify-evidence.json` (validated by tools/af/evidence.py before a review is sent).
 
 ## Test evidence
-Tested head 2d6743dc6e0db7f9967a3c2b526a4884f088a4b3: `python -m unittest discover -s tests -v` = 323 tests, 322 OK, 0 failed, 0 errors, 1 self-skip (guard that skips when the real home already has an install manifest), 799 s, run by the functional-test-reviewer agent on exactly this tree.
+Tested head 75ee95ba2996c5fbda483042d53f5b9304467575: `python -m unittest discover -s tests -v` = 338 tests, 337 OK, 0 failed, 0 errors, 1 self-skip (guard that skips when the real home already has an install manifest), 1129 s, run by the functional-test-reviewer agent on exactly this tree.
 
 ## History of the review
 - Round 1 (head 9befa56): MAJOR x3, MINOR x2 - remediated (change 0005).
 - Round 2 (7728951): MAJOR x2 - remediated (change 0006).
 - Round 3 (4dcd4ba): APPROVE.
 - Root commit 20c0098 reviewed separately: MAJOR x4, MINOR x2 - remediated (change 0007).
+- Round 5 (5ee25f9): MAJOR - zero-pass runs accepted as evidence; remediated (change 0011).
+- Round 6 (28b6830): MINOR - stale Markdown summary only; corrected in the following commit.
 - Round 4 (b9b4fe1): MAJOR x2 left open (heading-only evidence, mtime freshness) plus input-hash correspondence - closed by this change set (change 0009): structured evidence, sprint-bound artifacts with digests, pre-computed prompt hash comparison.
 
 ## NOT_RUN

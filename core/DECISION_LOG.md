@@ -11,6 +11,7 @@
 - Decision: the generated state view never overwrites an existing STATE.md that lacks the generated marker; it is written to AF_STATE.md instead. Basis: the framework overwrote a tracked docs/sdlc/STATE.md in another project.
 - Evidence: full suite 338 tests, 337 OK, 1 skipped, 0 failures (test agent log full14.log). See docs/changes/0011-zero-pass-evidence-and-foreign-state-view.md.
 - Evidence file now points tested_head at 75ee95b (338 total, 337 passed, 1 skipped) and passes evidence.validate; round 6 PM-GPT review is requested on that basis.
+- Round 6 PM-GPT on 28b6830: MINOR, no blocking findings; only the stale verify-evidence.md summary. Corrected; a verification review of the corrected head is requested because the gate needs APPROVE bound to the exact HEAD.
 - Planned and recorded, not done here: sync core agents with the operator's installed versions; import connector-free ADK skills (they need rewriting, since they reference Agentic Studio internals).
 
 ## 2026-10-28 - Import of the operator's agents and skills, /af toggle, push-gate fix
