@@ -22,6 +22,28 @@ GIT_ENV = dict(os.environ, GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@t", GIT_COMM
                GIT_COMMITTER_EMAIL="t@t")
 GIT_ENV.pop("AF_PM_REVIEW_JS", None)
 
+# The push/PR block is OFF by default in the product (phase-map push_gate.enabled=false). The gate behaviour
+# tests (hook, pre-push, hardening, round tests) need it ON, so the suite enables it explicitly through the
+# environment here, for in-process calls (os.environ) and for subprocesses (GIT_ENV). Tests of the DEFAULT
+# configuration use `gate_default_env()` / `default_gate()` below to clear it again.
+os.environ["AF_PUSH_GATE"] = "on"
+GIT_ENV["AF_PUSH_GATE"] = "on"
+DEFAULT_GATE_ENV = {"AF_PUSH_GATE": ""}   # pass as run_cli(..., env=DEFAULT_GATE_ENV): empty value = not enabled
+
+
+import contextlib as _contextlib
+
+
+@_contextlib.contextmanager
+def default_gate():
+    """In-process: run with the product default (no AF_PUSH_GATE override)."""
+    saved = os.environ.pop("AF_PUSH_GATE", None)
+    try:
+        yield
+    finally:
+        if saved is not None:
+            os.environ["AF_PUSH_GATE"] = saved
+
 APPROVE = {
     "ok": True, "review_status": "RAN", "verdict": "APPROVE", "final": True, "truncated": False,
     "final_overridden": False, "correlated": True, "replyId": "reply-1", "reviewRequestId": "req-1",

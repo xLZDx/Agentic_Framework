@@ -45,6 +45,9 @@ def cmd_status(args) -> int:
 
 def _require_gate(args, mode: str) -> bool:
     """Hard mode needs the authoritative git pre-push gate; refuse activation when it cannot be installed."""
+    from af import hook
+    if not hook.gate_enabled():  # the push/PR block is opt-in; GPT-PM review is the only approval
+        return True
     rc = cmd_install_githook(args)
     if rc != 0 and mode == "hard":
         print("Framework NOT enabled in hard mode: the git pre-push gate could not be installed "

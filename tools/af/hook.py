@@ -8,6 +8,7 @@ the same gate from the git pre-push hook (see `af_cli.py install-githook`).
 from __future__ import annotations
 
 import json
+import os
 import re
 import shlex
 import sys
@@ -111,8 +112,17 @@ def _project(cwd: str) -> Path | None:
         return None
 
 
+def gate_enabled() -> bool:
+    """The push/PR block is opt-in: phase-map push_gate.enabled, or AF_PUSH_GATE=on for one process."""
+    if os.environ.get("AF_PUSH_GATE", "").strip().lower() in ("on", "1", "true"):
+        return True
+    return bool(core.load_phase_map()["push_gate"].get("enabled", False))
+
+
 def gate_decision(project: Path, command: str) -> str | None:
-    """Return a denial reason, or None when the command is allowed."""
+    """Return a denial reason, or None when the command is allowed (always None while the gate is off)."""
+    if not gate_enabled():
+        return None
     state = core.read_state(project)
     if not state or state.get("mode") != "hard" or state.get("paused"):
         return None

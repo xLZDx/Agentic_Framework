@@ -17,6 +17,7 @@
     {"n": 10, "name": "Report and retro", "roles": ["reporting-analyst"], "skills": ["sdlc-metrics", "sprint-ceremonies"], "artifacts": ["sprint-report.md"]}
   ],
   "push_gate": {
+    "enabled": false,
     "blocked_commands": ["git push", "gh pr create", "gh pr merge"],
     "unlock_phase": 8,
     "approval_file": "gate-approval.md",

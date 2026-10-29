@@ -12,6 +12,10 @@
 - Evidence: full suite 338 tests, 337 OK, 1 skipped, 0 failures (test agent log full14.log). See docs/changes/0011-zero-pass-evidence-and-foreign-state-view.md.
 - Evidence file now points tested_head at 75ee95b (338 total, 337 passed, 1 skipped) and passes evidence.validate; round 6 PM-GPT review is requested on that basis.
 - Round 6 PM-GPT on 28b6830: MINOR, no blocking findings; only the stale verify-evidence.md summary. Corrected; a verification review of the corrected head is requested because the gate needs APPROVE bound to the exact HEAD.
+## 2026-10-29 - Push/PR block off by default (change 0014)
+- Operator decision: the framework's own push/PR block is not needed, GPT-PM review is sufficient. Per the operator's NO SECONDARY BLOCKERS rule the mechanism stays as an opt-in (`push_gate.enabled` or `AF_PUSH_GATE=on`) instead of being deleted; the pre-push hook is no longer installed on activation. Scope chosen by the operator: only the push/PR block; pre-send checks and the phase 8 transition rule are unchanged.
+- Evidence: sub20.log, 392 tests, 391 OK, 1 skipped.
+
 ## 2026-10-29 - Curated agents and engineer skills (change 0012)
 - Operator decision: core/ takes the installed curated agent versions as the base; 25 agents replaced (Claude copy primary). Operator decision: import only ADK pieces independent of corporate systems; of 26 ADK skills only backend-engineer and frontend-engineer were rewritten as self-contained skills, the rest duplicate existing agents or depend on Agentic Studio internals.
 - Evidence: full15.log 355 tests with 9 failures, all fixed; affected files 41/41 (sub17.log). Per operator instruction no repeated complete suite after small fixes.
