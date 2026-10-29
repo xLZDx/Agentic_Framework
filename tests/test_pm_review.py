@@ -107,11 +107,16 @@ class Request(unittest.TestCase):
         H.write_evidence(self.repo)
         self.base = H.first_commit(self.repo)
         self.tools = H.tmpdir(self)
-        (self.tools / "review.js").write_text(H.FAKE_REVIEW_JS, encoding="utf-8")
+        fake_review = H.FAKE_REVIEW_JS.replace(
+            "const head = cp.execSync('git -C \"' + cwd + '\" rev-parse HEAD').toString().trim();",
+            "const head = arg('--head') || cp.execSync('git -C \"' + cwd + '\" rev-parse HEAD').toString().trim();",
+        )
+        (self.tools / "review.js").write_text(fake_review, encoding="utf-8")
 
     def run_request(self, result=None, kind="code", repo=None, **opts):
         repo = repo or self.repo
         base = opts.pop("base", None) or (H.first_commit(repo) if repo != self.repo else self.base)
+        review_cwd = opts.pop("review_cwd", None)
         cfg = {"result": result if result is not None else APPROVE,
                "argv_out": str(self.tools / "argv.json"), "packet_out": str(self.tools / "packet.md")}
         cfg.update(opts)
@@ -120,7 +125,7 @@ class Request(unittest.TestCase):
         with mock.patch.dict(os.environ, env):
             buf = io.StringIO()
             with contextlib.redirect_stdout(buf):
-                rc = pm_review.request(repo, kind, base)
+                rc = pm_review.request(repo, kind, base, review_cwd=review_cwd)
         return rc, buf.getvalue()
 
     def approval_files(self, repo=None, kind="code"):
@@ -155,10 +160,38 @@ class Request(unittest.TestCase):
         argv = json.loads((self.tools / "argv.json").read_text(encoding="utf-8"))
         self.assertEqual(argv[argv.index("--cwd") + 1], str(self.repo))
         self.assertEqual(argv[argv.index("--base") + 1], self.base)
+        self.assertEqual(argv[argv.index("--head") + 1], core.head(self.repo))
         self.assertIn("--final", argv)
         packet = (self.tools / "packet.md").read_text(encoding="utf-8")
         self.assertIn(f"Exact HEAD under review: {core.head(self.repo)}", packet)
         self.assertIn("EVIDENCE-MARKER", packet)
+
+    def test_linked_candidate_routes_through_primary_checkout_and_pins_exact_head(self):
+        linked = self.tools / "candidate-worktree"
+        H.git(self.repo, "worktree", "add", "--detach", str(linked), core.head(self.repo))
+        try:
+            H.set_state(linked, phase=8)
+            H.stamp_phases_1_7(linked)
+            H.write_evidence(linked)
+            candidate_head = core.head(linked)
+            rc, out = self.run_request(repo=linked, review_cwd=self.repo)
+            self.assertEqual(rc, 0, out)
+            argv = json.loads((self.tools / "argv.json").read_text(encoding="utf-8"))
+            self.assertEqual(argv[argv.index("--cwd") + 1], str(self.repo.resolve()))
+            self.assertEqual(argv[argv.index("--head") + 1], candidate_head)
+            self.assertEqual(argv[argv.index("--base") + 1], self.base)
+            approval = json.loads((H.sdlc(linked) / ".pm-review" / "approval.json").read_text(encoding="utf-8"))
+            self.assertEqual(approval["head"], candidate_head)
+        finally:
+            H.git(self.repo, "worktree", "remove", "--force", str(linked))
+
+    def test_unrelated_review_checkout_is_refused_before_review_or_approval(self):
+        unrelated = H.make_repo(self)
+        rc, out = self.run_request(review_cwd=unrelated)
+        self.assertEqual(rc, 2)
+        self.assertIn("same Git repository", out)
+        self.assertFalse((self.tools / "argv.json").exists(), "review.js must not be invoked")
+        self.assertFalse(self.approval_files()[0].exists(), "refused routing must not create approval")
 
     def test_missing_verify_evidence_is_refused_for_code(self):
         (H.sdlc(self.repo) / "verify-evidence.json").unlink()
@@ -279,8 +312,12 @@ class Request(unittest.TestCase):
         cfg = {"result": APPROVE, "argv_out": str(self.tools / "argv.json"), "packet_out": str(self.tools / "packet.md")}
         (self.tools / "cfg.json").write_text(json.dumps(cfg), encoding="utf-8")
         env = {"AF_PM_REVIEW_JS": str(self.tools / "review.js"), "FAKE_CFG": str(self.tools / "cfg.json")}
-        r = H.run_cli(self.repo, "pm-review", "--kind", "code", "--base", self.base, env=env)
+        r = H.run_cli(self.repo, "pm-review", "--kind", "code", "--base", self.base,
+                      "--review-cwd", str(self.repo), env=env)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        argv = json.loads((self.tools / "argv.json").read_text(encoding="utf-8"))
+        self.assertEqual(argv[argv.index("--cwd") + 1], str(self.repo.resolve()))
+        self.assertEqual(argv[argv.index("--head") + 1], core.head(self.repo))
         self.assertEqual(H.run_cli(self.repo, "verify").returncode, 0)
         self.assertEqual(H.run_cli(self.repo, "next").returncode, 0)  # phase 8 -> 9 requires gate-approval.md + valid approval
         # rejected review exit code is 1

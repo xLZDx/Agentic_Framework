@@ -1,6 +1,6 @@
 Toggle and inspect the Agentic_Framework SDLC auto-orchestration for the current project.
 
-Arguments: `on [hard|soft] ["<sprint title>"]`, `off`, `status`, `next`, `pm-review --kind code|docs --base <ref>`, `verify`.
+Arguments: `on [hard|soft] ["<sprint title>"]`, `off`, `status`, `next`, `pm-review --kind code|docs --base <ref> [--review-cwd <registered checkout>]`, `verify`.
 
 Run exactly one command with the shell, from the project root, and report its output:
 
@@ -9,3 +9,5 @@ Run exactly one command with the shell, from the project root, and report its ou
 - `status`, `next`, `verify`, `pm-review ...` : pass through to `python {fw}/tools/af_cli.py <command>`.
 
 After `on`, follow the injected phase line and launch the listed roles as real agents. Never run `pm-review` or `next` on your own initiative unless the phase flow calls for it, and never hand-write the approval files. With no argument, run `status`.
+
+For a candidate in a linked Git worktree, pass `--review-cwd` with the registered primary checkout path. AF verifies both paths share the same Git common directory, then binds PM Bridge's review to the candidate's exact HEAD.

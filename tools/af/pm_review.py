@@ -104,8 +104,18 @@ def _preflight(project: Path, kind: str, base: str, head_sha: str) -> str | None
     return None
 
 
-def _review_cmd(node: str, review_js: Path, project: Path, base: str, packet: Path, project_id: str | None) -> list[str]:
-    cmd = [node, str(review_js), "--cwd", str(project), "--base", base, "--final", "--scope-note-file", str(packet)]
+def _git_common_dir(project: Path) -> Path | None:
+    try:
+        raw = core.git(project, "rev-parse", "--path-format=absolute", "--git-common-dir").strip()
+        return Path(raw).resolve(strict=True)
+    except (RuntimeError, OSError):
+        return None
+
+
+def _review_cmd(node: str, review_js: Path, review_cwd: Path, base: str, head_sha: str,
+                packet: Path, project_id: str | None) -> list[str]:
+    cmd = [node, str(review_js), "--cwd", str(review_cwd), "--base", base, "--head", head_sha,
+           "--final", "--scope-note-file", str(packet)]
     if project_id:
         cmd += ["--project", project_id]
     return cmd
@@ -120,7 +130,8 @@ def _expected_prompt(cmd: list[str], dump: Path) -> str | None:
     return dump.read_bytes().decode("utf-8") if dump.is_file() else None
 
 
-def request(project: Path, kind: str, base: str, node: str = "node", project_id: str | None = None) -> int:
+def request(project: Path, kind: str, base: str, node: str = "node", project_id: str | None = None,
+            review_cwd: Path | None = None) -> int:
     if kind not in KINDS:
         raise SystemExit(f"kind must be one of {KINDS}")
     review_js = core.find_review_js()
@@ -132,6 +143,13 @@ def request(project: Path, kind: str, base: str, node: str = "node", project_id:
         print("REFUSED: tracked changes are uncommitted; commit first so the approval binds to a real head:\n" + "\n".join(dirty[:10]))
         return 2
     head_sha = core.head(project)
+    review_cwd = Path(review_cwd or project).resolve()
+    project_common = _git_common_dir(project)
+    review_common = _git_common_dir(review_cwd)
+    if project_common is None or review_common is None or project_common != review_common:
+        print("REFUSED: --review-cwd must resolve to the same Git repository as the candidate project; "
+              "use the registered primary checkout for PM Bridge routing.")
+        return 2
     sd = core.state_dir(project)
     problem = _preflight(project, kind, base, head_sha)
     if problem:
@@ -141,7 +159,7 @@ def request(project: Path, kind: str, base: str, node: str = "node", project_id:
     pm_dir.mkdir(parents=True, exist_ok=True)
     packet = pm_dir / f"packet-{kind}-{head_sha[:12]}.md"
     packet.write_bytes(build_packet(project, kind, base, head_sha).encode("utf-8"))  # LF bytes, no newline translation
-    cmd = _review_cmd(node, review_js, project, base, packet, project_id)
+    cmd = _review_cmd(node, review_js, review_cwd, base, head_sha, packet, project_id)
 
     prompt = _expected_prompt(cmd, pm_dir / f"prompt-{kind}-{head_sha[:12]}.txt")
     if prompt is None:
