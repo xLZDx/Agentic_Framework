@@ -111,6 +111,8 @@ def _set(args, **kv) -> int:
 
 
 def cmd_on(args) -> int:
+    from af.hook import context_line
+
     p = _project(args)
     st = core.read_state(p)
     if st is None:
@@ -118,6 +120,7 @@ def cmd_on(args) -> int:
             return 1
         core.write_state(p, core.new_sprint_state(p, args.title, args.mode))
         print(f"Framework ON: started '{args.title}' at phase 1 ({args.mode}) in {p}")
+        print(context_line(p))
         return 0
     mode = args.mode if args.mode_given else st["mode"]
     if not _require_gate(args, mode):
@@ -126,6 +129,7 @@ def cmd_on(args) -> int:
     st["mode"] = mode
     core.write_state(p, st)
     print(f"Framework ON: resumed at phase {st['phase']} ({st['mode']}) in {p}")
+    print(context_line(p))
     return 0
 
 

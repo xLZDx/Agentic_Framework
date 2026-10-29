@@ -6,6 +6,12 @@
 - Phase 8 became "PM-GPT review and approve": mechanical, HEAD-bound, shared by Claude and GPT/Codex through PM Bridge `review.js`.
 - Global installation (`~/.claude`, `~/.codex`, settings hooks) is opt-in and not performed by this change.
 
+## 2026-10-29 - Zero-pass evidence rejected, foreign STATE.md protected
+- Decision: a verify-evidence run must contain at least one passing test (skipped tests are not evidence), and an empty reviewers list needs an explicit non-blank `reviewers_waived_reason`. Basis: GPT-PM round 5 MAJOR finding.
+- Decision: the generated state view never overwrites an existing STATE.md that lacks the generated marker; it is written to AF_STATE.md instead. Basis: the framework overwrote a tracked docs/sdlc/STATE.md in another project.
+- Evidence: full suite 338 tests, 337 OK, 1 skipped, 0 failures (test agent log full14.log). See docs/changes/0011-zero-pass-evidence-and-foreign-state-view.md.
+- Planned and recorded, not done here: sync core agents with the operator's installed versions; import connector-free ADK skills (they need rewriting, since they reference Agentic Studio internals).
+
 ## 2026-10-28 - Import of the operator's agents and skills, /af toggle, push-gate fix
 - Imported all 36 agents and 8 non-empty skills from the operator's agents-skills-repo into core/ (three skill folders there were empty and were skipped). `autonomous-completion.md` has no agent frontmatter, so it lives in core/policies/ and is not deployed as an agent.
 - All bundled roles are now in framework.json `bundled_agents`/`bundled_skills`; the deploy parser accepts inline `tools: [..]` lists and drops source-only keys (tier, token_budget_*); the target decides model and effort.

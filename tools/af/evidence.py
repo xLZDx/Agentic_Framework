@@ -6,11 +6,12 @@ missing, malformed, contradictory, red, stale against the code, or has open bloc
 Schema (all keys required unless marked optional):
 {
   "tested_head": "<git sha the tests ran against>",
-  "runs": [{"command": str, "total": int, "passed": int, "failed": int, "errors": int,
+  "runs": [{"command": str, "total": int, "passed": int (>0), "failed": int, "errors": int,
             "skipped": int, "log": str (optional)}],
   "not_run": [{"item": str, "reason": str}],
   "findings": {"open_blocker": int, "open_major": int},
-  "reviewers": [{"role": str, "model": str, "effort": str, "verdict": str}]   # may be empty
+  "reviewers": [{"role": str, "model": str, "effort": str, "verdict": str}],
+  "reviewers_waived_reason": str   # required only when reviewers is empty
 }
 """
 from __future__ import annotations
@@ -74,6 +75,8 @@ def validate(project: Path, head_sha: str) -> list[str]:
                 problems.append(f"runs[{i}] counts are contradictory (total != passed+failed+errors+skipped)")
             if r["total"] == 0:
                 problems.append(f"runs[{i}] ran zero tests")
+            elif r["passed"] == 0:
+                problems.append(f"runs[{i}] has no passing test (all skipped or failed); skipped tests are not evidence")
             if r["failed"] or r["errors"]:
                 problems.append(f"runs[{i}] is red ({r['failed']} failed, {r['errors']} errors)")
     nr = d.get("not_run")
@@ -90,8 +93,11 @@ def validate(project: Path, head_sha: str) -> list[str]:
         problems.append(f"open blocking findings: {f['open_blocker']} blocker, {f['open_major']} major")
     rv = d.get("reviewers")
     if not isinstance(rv, list):
-        problems.append("reviewers must be a list (may be empty)")
+        problems.append("reviewers must be a list")
     else:
+        if not rv and not _text(d.get("reviewers_waived_reason")):
+            problems.append("reviewers is empty: list the specialist reviewers or set a non-blank "
+                            "reviewers_waived_reason (an empty list is not reviewer consensus)")
         for i, x in enumerate(rv):
             if not (isinstance(x, dict) and all(_text(x.get(k)) for k in ("role", "model", "effort", "verdict"))):
                 problems.append(f"reviewers[{i}] needs role, model, effort, verdict")

@@ -199,7 +199,7 @@ class EvidenceValidate(unittest.TestCase):
                 self.ev(reviewers=v)
                 self.assertTrue(self.problems())
         self.ev(reviewers=[])
-        self.assertEqual(self.problems(), [])
+        self.assert_rejects("reviewers_waived_reason")  # empty list is no longer free
 
     def test_reviewer_field_null_is_rejected(self):
         good = {"role": "r", "model": "m", "effort": "e", "verdict": "APPROVE"}
@@ -213,6 +213,40 @@ class EvidenceValidate(unittest.TestCase):
             with self.subTest(entry=entry):
                 self.ev(not_run=[entry])
                 self.assertTrue(self.problems(), f"{entry} must be rejected")
+
+    def test_run_with_no_passing_test_rejected(self):
+        self.run_with(total=1, passed=0, skipped=1)
+        self.assert_rejects("no passing test")
+        self.run_with(total=3, passed=0, skipped=3)
+        self.assert_rejects("skipped tests are not evidence")
+
+    def test_mixed_runs_one_with_zero_passed_rejected(self):
+        good = {"command": "a", "total": 2, "passed": 2, "failed": 0, "errors": 0, "skipped": 0}
+        skipped = {"command": "b", "total": 1, "passed": 0, "failed": 0, "errors": 0, "skipped": 1}
+        self.ev(runs=[good, skipped])
+        self.assert_rejects("runs[1]")
+        self.ev(runs=[skipped, good])
+        self.assert_rejects("runs[0]")
+
+    def test_run_with_some_pass_and_some_skipped_still_ok(self):
+        self.run_with(total=5, passed=1, skipped=4)
+        self.assertEqual(self.problems(), [])
+
+    def test_empty_reviewers_need_non_blank_string_reason(self):
+        self.ev(reviewers=[])
+        self.assert_rejects("reviewers_waived_reason")
+        for bad in (None, "", "   ", 5, True, ["x"]):
+            with self.subTest(reason=bad):
+                self.ev(reviewers=[], reviewers_waived_reason=bad)
+                self.assert_rejects("reviewers_waived_reason")
+        self.ev(reviewers=[], reviewers_waived_reason="solo operator run; no agent roster available")
+        self.assertEqual(self.problems(), [])
+
+    def test_non_empty_reviewers_unaffected_by_waiver_field(self):
+        self.ev()  # defaults: one reviewer, no waiver
+        self.assertEqual(self.problems(), [])
+        self.ev(reviewers_waived_reason=None)  # irrelevant when reviewers are present
+        self.assertEqual(self.problems(), [])
 
     def test_all_problems_reported_together(self):
         self.ev(runs=[], findings={"open_blocker": 1, "open_major": 0}, not_run=[{}])
@@ -424,6 +458,21 @@ class PmReviewFlow(unittest.TestCase):
 
     # --- evidence integration
     def test_baseline_approves_and_runs_dump_then_real(self):
+        rc, out = self.request()
+        self.assertEqual(rc, 0, out)
+        self.assertEqual(self.call_log(), ["dump", "real"])
+
+    def test_no_passing_test_run_refused_before_review(self):
+        H.write_evidence(self.repo, runs=[{"command": "x", "total": 1, "passed": 0, "failed": 0, "errors": 0, "skipped": 1}])
+        self.refused_before_review(*self.request(), "no passing test")
+
+    def test_empty_reviewers_refused_before_review_unless_waived(self):
+        H.write_evidence(self.repo, reviewers=[])
+        self.refused_before_review(*self.request(), "reviewers_waived_reason")
+        for bad in (None, "  "):
+            H.write_evidence(self.repo, reviewers=[], reviewers_waived_reason=bad)
+            self.refused_before_review(*self.request(), "reviewers_waived_reason")
+        H.write_evidence(self.repo, reviewers=[], reviewers_waived_reason="operator waived reviewer roster")
         rc, out = self.request()
         self.assertEqual(rc, 0, out)
         self.assertEqual(self.call_log(), ["dump", "real"])
