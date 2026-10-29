@@ -21,3 +21,9 @@ See the not_run list in verify-evidence.json (real PM Bridge dump mode, real sch
 - Approval files are guarded by tooling and digests, not cryptography.
 - Text-based push detection is best effort; the git pre-push hook is the boundary.
 - `status` does not yet print the exact artifact requirements (backlog item 1).
+
+## Curated agents change (change 0012, remediation of round 7)
+- Earlier complete run `full15.log`: 355 tests, 9 failures (7 outdated expectations, 2 forbidden wording); all fixed.
+- Focused re-run after those fixes: `test_curated`, `test_deploy`, `test_deploy_imported` = 41/41 (`sub17.log`).
+- Round 7 remediation (unresolved skill references, reporting-analyst state authority, installer warning) is covered by the focused run recorded in `verify-evidence.json`, which stays authoritative.
+- NOT_RUN: complete suite on the final tree (operator rule: no complete re-runs after small fixes).

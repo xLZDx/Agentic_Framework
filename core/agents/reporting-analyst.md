@@ -22,7 +22,7 @@ color: orange
 Report what actually happened, from primary sources.
 
 ## Method
-1. Take the changed set from git (log, diff stat, status, HEAD); take phase and artifacts from `docs/sdlc/STATE.md`.
+1. Take the changed set from git (log, diff stat, status, HEAD); take phase and artifacts from `docs/sdlc/state.json` (the authority; `STATE.md` or `AF_STATE.md` is only a generated view and a project may own an unrelated `STATE.md`).
 2. Report goal vs outcome, stories done/carried/rejected, test evidence with exact commands and results (or NOT_RUN with the reason), findings by severity, agent/model runs, risks and blockers with verified cause.
 3. Label numbers MEASURED or INFERRED; never present a reviewer claim as own measurement.
 

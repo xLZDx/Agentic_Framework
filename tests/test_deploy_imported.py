@@ -57,7 +57,7 @@ class ImportedAgents(unittest.TestCase):
         self.assertGreaterEqual(len(AGENTS), 43)
         self.assertIn("implementation-engineer", AGENTS)
         self.assertEqual(len(set(AGENTS)), len(AGENTS))
-        self.assertGreaterEqual(len(SKILLS), 18)
+        self.assertGreaterEqual(len(SKILLS), 29)
         self.assertEqual(len(set(SKILLS)), len(SKILLS))
         for new in ("backend-engineer", "frontend-engineer"):
             self.assertIn(new, SKILLS)

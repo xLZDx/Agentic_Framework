@@ -124,6 +124,15 @@ def remove_hooks(settings: Path, log: list, dry: bool) -> None:
         settings.write_text(json.dumps(new, indent=2) + "\n", encoding="utf-8")
 
 
+def missing_external_skills_note(home: Path) -> str:
+    """Skills the framework only references (external_skills) must exist in the target home."""
+    cfg = json.loads((FW / "core" / "framework.json").read_text(encoding="utf-8"))
+    missing = [s for s in cfg.get("external_skills", []) if not (home / "skills" / s / "SKILL.md").exists()]
+    if not missing:
+        return "EXTERNAL-SKILLS ok: every external skill is present"
+    return "EXTERNAL-SKILLS MISSING (agents reference them; install them separately): " + ", ".join(missing)
+
+
 def install(home: Path, target: str, log: list, dry: bool) -> None:
     dep = FW / "deploy" / target
     prev = load_manifest(home)
@@ -132,6 +141,7 @@ def install(home: Path, target: str, log: list, dry: bool) -> None:
         copy_tree(dep / sub, home / sub, manifest, prev, log, dry)
     if target == "claude":
         merge_hooks(home / "settings.json", log, dry)
+    log.append(missing_external_skills_note(home))
     # entries we no longer ship stay tracked so uninstall can still find them
     for k, v in prev.items():
         manifest.setdefault(k, v)

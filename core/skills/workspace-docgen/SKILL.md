@@ -50,7 +50,6 @@ ARCHITECTURE / CONTEXT pass is heavier — run it only when needed.
 
 ## Install
 
-This SKILL.md is authored in `D:\Repo\agents-skills-repo\skills\workspace-docgen\`.
 To activate in Claude Code, copy the folder to `~/.claude/skills/workspace-docgen/`
 (operator step — `~/.claude` is on C:, Write-denied to the assistant). For Codex / Copilot,
 paste the body above as a project prompt / instruction file.

@@ -17,6 +17,7 @@
 - Evidence: full15.log 355 tests with 9 failures, all fixed; affected files 41/41 (sub17.log). Per operator instruction no repeated complete suite after small fixes.
 - Evidence file now has tested_head 2c18fd6 with the affected-files run; the unrerun complete suite is disclosed in not_run. Round 7 PM-GPT review requested from base cf73562.
 - The round 6 approval record (approval.json, gate-approval.md) is tracked and must be committed before the next review, otherwise pm-review refuses with "tracked changes are uncommitted". Committed with this entry.
+- Round 7 PM-GPT on 4f5fa0e: MAJOR (13 unresolved agent skill references) plus two MINOR. Decision (change 0013): bundle the 11 generic skills, declare html-report and financial-ml-contract external because they hold operator-specific content, make unresolved references a failing test, and have the installer report missing external skills. Evidence: sub19.log 77 tests, 76 OK, 1 skipped.
 - Done in change 0012: sync of core agents with the installed versions and the connector-free ADK import (rewritten, since the originals reference Agentic Studio internals).
 
 ## 2026-10-28 - Import of the operator's agents and skills, /af toggle, push-gate fix
