@@ -104,10 +104,20 @@ def _preflight(project: Path, kind: str, base: str, head_sha: str) -> str | None
     return None
 
 
-def _review_cmd(node: str, review_js: Path, project: Path, base: str, packet: Path, project_id: str | None) -> list[str]:
+def _review_cmd(
+    node: str,
+    review_js: Path,
+    project: Path,
+    base: str,
+    packet: Path,
+    project_id: str | None,
+    recover_request_id: str | None = None,
+) -> list[str]:
     cmd = [node, str(review_js), "--cwd", str(project), "--base", base, "--final", "--scope-note-file", str(packet)]
     if project_id:
         cmd += ["--project", project_id]
+    if recover_request_id:
+        cmd += ["--recover-request-id", recover_request_id]
     return cmd
 
 
@@ -120,7 +130,14 @@ def _expected_prompt(cmd: list[str], dump: Path) -> str | None:
     return dump.read_bytes().decode("utf-8") if dump.is_file() else None
 
 
-def request(project: Path, kind: str, base: str, node: str = "node", project_id: str | None = None) -> int:
+def request(
+    project: Path,
+    kind: str,
+    base: str,
+    node: str = "node",
+    project_id: str | None = None,
+    recover_request_id: str | None = None,
+) -> int:
     if kind not in KINDS:
         raise SystemExit(f"kind must be one of {KINDS}")
     review_js = core.find_review_js()
@@ -141,7 +158,7 @@ def request(project: Path, kind: str, base: str, node: str = "node", project_id:
     pm_dir.mkdir(parents=True, exist_ok=True)
     packet = pm_dir / f"packet-{kind}-{head_sha[:12]}.md"
     packet.write_bytes(build_packet(project, kind, base, head_sha).encode("utf-8"))  # LF bytes, no newline translation
-    cmd = _review_cmd(node, review_js, project, base, packet, project_id)
+    cmd = _review_cmd(node, review_js, project, base, packet, project_id, recover_request_id)
 
     prompt = _expected_prompt(cmd, pm_dir / f"prompt-{kind}-{head_sha[:12]}.txt")
     if prompt is None:

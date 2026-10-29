@@ -291,6 +291,44 @@ class Request(unittest.TestCase):
         r = H.run_cli(self.repo, "pm-review", "--base", self.base, env=env)
         self.assertEqual(r.returncode, 1)
 
+    def test_cli_pm_review_recovery_forwards_id_and_records_only_valid_correlated_approval(self):
+        recovery_id = "req-1"
+        cfg = {"result": APPROVE, "argv_out": str(self.tools / "argv.json"),
+               "packet_out": str(self.tools / "packet.md")}
+        (self.tools / "cfg.json").write_text(json.dumps(cfg), encoding="utf-8")
+        env = {"AF_PM_REVIEW_JS": str(self.tools / "review.js"), "FAKE_CFG": str(self.tools / "cfg.json")}
+
+        accepted = H.run_cli(
+            self.repo, "pm-review", "--kind", "code", "--base", self.base,
+            "--recover-request-id", recovery_id, env=env,
+        )
+        self.assertEqual(accepted.returncode, 0, accepted.stdout + accepted.stderr)
+        argv = json.loads((self.tools / "argv.json").read_text(encoding="utf-8"))
+        self.assertIn("--recover-request-id", argv)
+        self.assertEqual(argv[argv.index("--recover-request-id") + 1], recovery_id)
+        approval, approval_md = self.approval_files()
+        recorded = json.loads(approval.read_text(encoding="utf-8"))
+        self.assertEqual(recorded["request_id"], recovery_id)
+        self.assertTrue(approval_md.is_file())
+        self.assertEqual(H.run_cli(self.repo, "verify").returncode, 0)
+
+        rejected_repo = H.make_repo(self)
+        H.commit_file(rejected_repo, "a.txt")
+        H.set_state(rejected_repo, phase=8)
+        H.stamp_phases_1_7(rejected_repo)
+        H.write_evidence(rejected_repo)
+        rejected_cfg = dict(cfg, result=dict(APPROVE, correlated=False))
+        (self.tools / "cfg.json").write_text(json.dumps(rejected_cfg), encoding="utf-8")
+        rejected = H.run_cli(
+            rejected_repo, "pm-review", "--kind", "code", "--base", H.first_commit(rejected_repo),
+            "--recover-request-id", recovery_id, env=env,
+        )
+        self.assertEqual(rejected.returncode, 1, rejected.stdout + rejected.stderr)
+        self.assertIn("NOT_APPROVED", rejected.stdout)
+        rejected_approval, rejected_md = self.approval_files(rejected_repo)
+        self.assertFalse(rejected_approval.exists(), "uncorrelated recovery must not write approval.json")
+        self.assertFalse(rejected_md.exists(), "uncorrelated recovery must not write gate-approval.md")
+
 
 if __name__ == "__main__":
     unittest.main()

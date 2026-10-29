@@ -170,7 +170,10 @@ def cmd_mode(args) -> int:
 
 
 def cmd_pm_review(args) -> int:
-    return pm_review.request(_project(args), args.kind, args.base, node=args.node, project_id=args.project_id)
+    return pm_review.request(
+        _project(args), args.kind, args.base, node=args.node, project_id=args.project_id,
+        recover_request_id=args.recover_request_id,
+    )
 
 
 def cmd_verify(args) -> int:
@@ -233,7 +236,7 @@ def main(argv=None) -> int:
     s = sub.add_parser("on"); s.add_argument("--mode", default=None, choices=["hard", "soft"]); s.add_argument("--title", default="Sprint"); s.set_defaults(fn=cmd_on)
     sub.add_parser("off").set_defaults(fn=cmd_off)
     sub.add_parser("migrate").set_defaults(fn=cmd_migrate)
-    s = sub.add_parser("pm-review"); s.add_argument("--kind", choices=list(pm_review.KINDS), default="code"); s.add_argument("--base", required=True); s.add_argument("--node", default="node"); s.add_argument("--project-id"); s.set_defaults(fn=cmd_pm_review)
+    s = sub.add_parser("pm-review"); s.add_argument("--kind", choices=list(pm_review.KINDS), default="code"); s.add_argument("--base", required=True); s.add_argument("--node", default="node"); s.add_argument("--project-id"); s.add_argument("--recover-request-id", help="recover a correlated durable PM Bridge reply without sending a duplicate review"); s.set_defaults(fn=cmd_pm_review)
     s = sub.add_parser("verify"); s.add_argument("--kind", choices=list(pm_review.KINDS), default="code"); s.set_defaults(fn=cmd_verify)
     sub.add_parser("hook").set_defaults(fn=cmd_hook)
     sub.add_parser("deploy").set_defaults(fn=cmd_deploy)
