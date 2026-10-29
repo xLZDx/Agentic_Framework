@@ -57,7 +57,10 @@ class ImportedAgents(unittest.TestCase):
         self.assertGreaterEqual(len(AGENTS), 43)
         self.assertIn("implementation-engineer", AGENTS)
         self.assertEqual(len(set(AGENTS)), len(AGENTS))
-        self.assertEqual(len(SKILLS), 16)
+        self.assertGreaterEqual(len(SKILLS), 18)
+        self.assertEqual(len(set(SKILLS)), len(SKILLS))
+        for new in ("backend-engineer", "frontend-engineer"):
+            self.assertIn(new, SKILLS)
         self.assertEqual(len(list((DEPLOY / "claude" / "agents").glob("*.md"))), len(AGENTS))
         self.assertEqual(len(list((DEPLOY / "codex" / "agents").glob("*.toml"))), len(AGENTS))
 
@@ -85,7 +88,7 @@ class ImportedAgents(unittest.TestCase):
                 d = tomllib.loads((DEPLOY / "codex" / "agents" / f"{name}.toml").read_text(encoding="utf-8"))
                 self.assertEqual(d["name"], name)
                 self.assertEqual(d["model"], "gpt-6-luna")
-                self.assertEqual(d["model_reasoning_effort"], "medium")
+                self.assertEqual(d["model_reasoning_effort"], deploy.agent_effort(deploy.parse_agent(ROOT / "core" / "agents" / f"{name}.md")[0], CFG["targets"]["codex"], ("low", "medium")))
                 self.assertTrue(d["description"].strip())
                 self.assertGreater(len(d["developer_instructions"]), 50)
 
@@ -117,8 +120,12 @@ class ImportedAgents(unittest.TestCase):
         self.assertEqual(body.strip(), "body")
 
     def test_agent_without_tools_has_no_tools_key(self):
-        self.assertEqual(source_tools("ml-engineer"), [])
-        self.assertNotIn("tools", claude_fm(DEPLOY / "claude" / "agents" / "ml-engineer.md"))
+        toolless = [n for n in AGENTS if source_tools(n) == []]
+        for n in toolless:  # may be empty after the curated import; then nothing to assert
+            self.assertNotIn("tools", claude_fm(DEPLOY / "claude" / "agents" / f"{n}.md"))
+        # synthetic agent without tools always renders without a tools key
+        meta = {"name": "x", "description": "d"}
+        self.assertNotIn("tools:", deploy.render_claude_agent(meta, "body", CFG["targets"]["claude"]))
 
     def test_policy_file_not_deployed_as_agent(self):
         self.assertTrue((ROOT / "core" / "policies" / "autonomous-completion.md").is_file())

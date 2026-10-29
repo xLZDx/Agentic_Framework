@@ -8,4 +8,5 @@
 ## Open
 1. `af_cli.py status` should print the exact artifact requirements (file names, the `Sprint: <id>` stamping line, where to write them) so an agent does not read the framework source and trigger permission prompts (operator report, Codex session of 2026-10-29).
 2. Not exercised against the real PM Bridge: review.js dump-only mode with a live review; a phase-8 push through the pre-push hook with a genuine approval.
+4. Thirteen skills named in curated agent frontmatter (a11y-contract, ci-release-contract, context-memory-hygiene, db-change-contract, financial-ml-contract, git-worktree-ops, html-report, migration-safety, observability-contract, performance-testing, repo-recon, security-evidence-contract, ux-design-contract) are not bundled; on a machine without them the references dangle. Bundle them or list them as external_skills.
 3. Installed files are LF while deploy/ files are CRLF on Windows (cosmetic).

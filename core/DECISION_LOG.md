@@ -12,7 +12,10 @@
 - Evidence: full suite 338 tests, 337 OK, 1 skipped, 0 failures (test agent log full14.log). See docs/changes/0011-zero-pass-evidence-and-foreign-state-view.md.
 - Evidence file now points tested_head at 75ee95b (338 total, 337 passed, 1 skipped) and passes evidence.validate; round 6 PM-GPT review is requested on that basis.
 - Round 6 PM-GPT on 28b6830: MINOR, no blocking findings; only the stale verify-evidence.md summary. Corrected; a verification review of the corrected head is requested because the gate needs APPROVE bound to the exact HEAD.
-- Planned and recorded, not done here: sync core agents with the operator's installed versions; import connector-free ADK skills (they need rewriting, since they reference Agentic Studio internals).
+## 2026-10-29 - Curated agents and engineer skills (change 0012)
+- Operator decision: core/ takes the installed curated agent versions as the base; 25 agents replaced (Claude copy primary). Operator decision: import only ADK pieces independent of corporate systems; of 26 ADK skills only backend-engineer and frontend-engineer were rewritten as self-contained skills, the rest duplicate existing agents or depend on Agentic Studio internals.
+- Evidence: full15.log 355 tests with 9 failures, all fixed; affected files 41/41 (sub17.log). Per operator instruction no repeated complete suite after small fixes.
+- Done in change 0012: sync of core agents with the installed versions and the connector-free ADK import (rewritten, since the originals reference Agentic Studio internals).
 
 ## 2026-10-28 - Import of the operator's agents and skills, /af toggle, push-gate fix
 - Imported all 36 agents and 8 non-empty skills from the operator's agents-skills-repo into core/ (three skill folders there were empty and were skipped). `autonomous-completion.md` has no agent frontmatter, so it lives in core/policies/ and is not deployed as an agent.

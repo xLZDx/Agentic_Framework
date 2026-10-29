@@ -95,7 +95,7 @@ class Build(unittest.TestCase):
                 t = tomllib.loads(f.read_text(encoding="utf-8"))
                 self.assertEqual(t["name"], name)
                 self.assertEqual(t["model"], "gpt-6-luna")
-                self.assertEqual(t["model_reasoning_effort"], "medium")
+                self.assertEqual(t["model_reasoning_effort"], deploy.agent_effort(deploy.parse_agent(ROOT / "core" / "agents" / f"{name}.md")[0], CFG["targets"]["codex"], ("low", "medium")))
                 src_meta, src_body = deploy.parse_agent(ROOT / "core" / "agents" / f"{name}.md")
                 self.assertEqual(t["description"], src_meta["description"])
                 self.assertEqual(t["developer_instructions"], src_body.strip())
