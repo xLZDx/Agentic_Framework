@@ -1,17 +1,21 @@
 {
-  "tested_head": "75ee95ba2996c5fbda483042d53f5b9304467575",
+  "tested_head": "2c18fd6f80b2a000176ddf2f6978b4ff9627ad4b",
   "runs": [
     {
-      "command": "python -m unittest discover -s tests -v",
-      "total": 338,
-      "passed": 337,
+      "command": "python -m unittest -v test_curated test_deploy test_deploy_imported (cwd tests)",
+      "total": 41,
+      "passed": 41,
       "failed": 0,
       "errors": 0,
-      "skipped": 1,
-      "log": "full14.log (1129 s)"
+      "skipped": 0,
+      "log": "sub17.log (3 s)"
     }
   ],
   "not_run": [
+    {
+      "item": "complete suite on the final tree",
+      "reason": "last complete run full15.log (355 tests) had 9 failures, 7 outdated expectations and 2 forbidden-wording hits, all fixed; per operator instruction only the three affected test files were re-run, the other files were not re-run after the fixes"
+    },
     {
       "item": "real PM Bridge review.js dump-only mode with a live review",
       "reason": "tests use a fake review.js; the real one was only exercised manually (two identical prompt dumps)"
@@ -42,7 +46,7 @@
       "role": "functional-test-reviewer",
       "model": "sonnet",
       "effort": "medium",
-      "verdict": "suite green 322/323, 1 self-skip, no open product bugs"
+      "verdict": "affected files 41/41 green after fixes; full15 failures all fixed; no open product bugs"
     }
   ]
 }

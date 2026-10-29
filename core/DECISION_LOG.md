@@ -15,6 +15,7 @@
 ## 2026-10-29 - Curated agents and engineer skills (change 0012)
 - Operator decision: core/ takes the installed curated agent versions as the base; 25 agents replaced (Claude copy primary). Operator decision: import only ADK pieces independent of corporate systems; of 26 ADK skills only backend-engineer and frontend-engineer were rewritten as self-contained skills, the rest duplicate existing agents or depend on Agentic Studio internals.
 - Evidence: full15.log 355 tests with 9 failures, all fixed; affected files 41/41 (sub17.log). Per operator instruction no repeated complete suite after small fixes.
+- Evidence file now has tested_head 2c18fd6 with the affected-files run; the unrerun complete suite is disclosed in not_run. Round 7 PM-GPT review requested from base cf73562.
 - Done in change 0012: sync of core agents with the installed versions and the connector-free ADK import (rewritten, since the originals reference Agentic Studio internals).
 
 ## 2026-10-28 - Import of the operator's agents and skills, /af toggle, push-gate fix
