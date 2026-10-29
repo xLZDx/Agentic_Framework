@@ -1,0 +1,48 @@
+{
+  "tested_head": "2d6743dc6e0db7f9967a3c2b526a4884f088a4b3",
+  "runs": [
+    {
+      "command": "python -m unittest discover -s tests -v",
+      "total": 323,
+      "passed": 322,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 1,
+      "log": "full12.log (799 s)"
+    }
+  ],
+  "not_run": [
+    {
+      "item": "real PM Bridge review.js dump-only mode with a live review",
+      "reason": "tests use a fake review.js; the real one was only exercised manually (two identical prompt dumps)"
+    },
+    {
+      "item": "real schtasks and registry operations",
+      "reason": "tests assert argv only; no real system state is changed by tests"
+    },
+    {
+      "item": "install into the real ~/.claude and ~/.codex from tests",
+      "reason": "tests use temp homes; NeverTouchesRealHomes self-skips because a real install exists"
+    },
+    {
+      "item": "phase-8 git push through the pre-push hook with a genuine approval",
+      "reason": "covered only by gate_decision and fake-approval tests"
+    },
+    {
+      "item": "mutation checks",
+      "reason": "not run by operator policy"
+    }
+  ],
+  "findings": {
+    "open_blocker": 0,
+    "open_major": 0
+  },
+  "reviewers": [
+    {
+      "role": "functional-test-reviewer",
+      "model": "sonnet",
+      "effort": "medium",
+      "verdict": "suite green 322/323, 1 self-skip, no open product bugs"
+    }
+  ]
+}
