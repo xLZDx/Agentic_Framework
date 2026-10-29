@@ -1,13 +1,23 @@
 {
-  "approval_id": "PMG-20261028-4dcd4ba9",
+  "approval_id": "PMG-20261029-cf73562d",
   "kind": "code",
-  "head": "4dcd4ba9453c483b3c364900621ee7ffa5c1eef9",
-  "base": "7728951",
+  "head": "cf73562d60a2b8f9539b3aa89331ae4dcabb31c4",
+  "base": "75ee95b",
+  "base_sha": "75ee95ba2996c5fbda483042d53f5b9304467575",
   "verdict": "APPROVE",
-  "request_id": "d1c1400f-078c-46b0-a184-d3a74c26b4cc",
-  "reply_id": "74c7b03b-f61a-4b31-9c5c-109014cb8114",
-  "input_hash": "022b764382ae5d01884c30101eb105c6f0c375de3002f3b9a28056f90e233347",
-  "reply_sha256": "3dd71fcd7e57456de118f0c7859f1e9f9531504ec3eb793b18a1bb1abcbb02b6",
-  "recorded": "2026-10-28T22:11:34+00:00",
+  "request_id": "c8ffcc30-e5a7-4dc1-ac44-7fafba198c91",
+  "reply_id": "7bf7930e-6c2c-49db-88a3-9ad8faa379e5",
+  "input_hash": "845c0705391d102164abbc31a457fbf670c9a8c04ce61d395e2e9433b1bb24bb",
+  "expected_input_hash": "845c0705391d102164abbc31a457fbf670c9a8c04ce61d395e2e9433b1bb24bb",
+  "diff_sha256": "83bf1c48f7d7c9092147733621f68a5a198f9eaa32e27500cfce7321910a222b",
+  "diff_in_prompt_sha256": "912f59a3d41ab6e9a1be46f6486da27e8fe22635cc7e6ea4fa6e67ff127b1cdb",
+  "evidence_sha256": "2b1c2a7f30469d9884321a20c3ea1becff2a53213bebeb84959f0473e492831b",
+  "sprint_id": null,
+  "artifacts": {
+    "verify-evidence.md": "745af71b727f80617400f308e6f04d8cec1731bf43058981d992486b78cec091",
+    "verify-evidence.json": "2b1c2a7f30469d9884321a20c3ea1becff2a53213bebeb84959f0473e492831b"
+  },
+  "reply_sha256": "6dfe48ca6a3e6c3486906345f3c10661287b35fda49220255b4a8bbf2a6d8579",
+  "recorded": "2026-10-29T02:28:27+00:00",
   "reviewer": "GPT-PM via PM Bridge review.js"
 }
