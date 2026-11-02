@@ -134,6 +134,302 @@ class Request(unittest.TestCase):
         m = H.sdlc(repo) / ("gate-approval.md" if kind == "code" else "docs-approval.md")
         return j, m
 
+    def pm_review_tree_bytes(self, repo):
+        root = H.sdlc(repo) / ".pm-review"
+        if not root.is_dir():
+            return {}
+        return {
+            path.relative_to(root).as_posix(): path.read_bytes()
+            for path in sorted(root.rglob("*"))
+            if path.is_file()
+        }
+
+    def approve_committed_baseline(self):
+        H.git(self.repo, "add", "--all")
+        H.git(self.repo, "commit", "-q", "-m", "record review baseline")
+        approved_head = core.head(self.repo)
+        rc, out = self.run_request()
+        self.assertEqual(rc, 0, out)
+        approval = json.loads(self.approval_files()[0].read_text(encoding="utf-8"))
+        self.assertEqual(approval["head"], approved_head)
+        return approval
+
+    def commit_code_and_evidence(self, file_name="next.py"):
+        code_head = H.commit_file(self.repo, file_name, "changed\n")
+        H.write_evidence(self.repo, tested_head=code_head)
+        H.git(self.repo, "add", "docs/sdlc/verify-evidence.json")
+        H.git(self.repo, "commit", "-q", "-m", "record new verification evidence")
+        return core.head(self.repo)
+
+    def approve_incremental_successor(self, previous_head, file_name):
+        self.commit_code_and_evidence(file_name)
+        rc, out = self.run_request()
+        self.assertEqual(rc, 0, out)
+        approval = json.loads(self.approval_files()[0].read_text(encoding="utf-8"))
+        self.assertEqual(approval["base"], previous_head)
+        self.assertEqual(approval["head"], core.head(self.repo))
+        return approval
+
+    def test_incremental_review_uses_valid_prior_approval_and_binds_new_head(self):
+        previous = self.approve_committed_baseline()
+        self.commit_code_and_evidence()
+        new_head = core.head(self.repo)
+
+        rc, out = self.run_request()
+        self.assertEqual(rc, 0, out)
+        argv = json.loads((self.tools / "argv.json").read_text(encoding="utf-8"))
+        self.assertEqual(argv[argv.index("--base") + 1], previous["head"])
+
+        packet = (self.tools / "packet.md").read_text(encoding="utf-8")
+        self.assertIn("Validated approval chain (oldest first):", packet)
+        self.assertIn(
+            f"- {previous['approval_id']} | HEAD {previous['head']} | request/reply "
+            f"{previous['request_id']} / {previous['reply_id']}",
+            packet,
+        )
+
+        approval = json.loads(self.approval_files()[0].read_text(encoding="utf-8"))
+        self.assertEqual(approval["head"], new_head)
+        self.assertEqual(approval["base"], previous["head"])
+        self.assertEqual(approval["sprint_base"], self.base)
+        self.assertEqual(approval["previous_approval"]["approval_id"], previous["approval_id"])
+        self.assertEqual(approval["previous_approval"]["head"], previous["head"])
+        ok, why = pm_review.verify(self.repo)
+        self.assertTrue(ok, why)
+
+    def test_linked_candidate_uses_prior_approval_from_registered_checkout(self):
+        previous = self.approve_committed_baseline()
+        self.commit_code_and_evidence()
+        candidate_head = core.head(self.repo)
+        registered_before = self.pm_review_tree_bytes(self.repo)
+        linked = self.tools / "incremental-candidate-worktree"
+        H.git(self.repo, "worktree", "add", "--detach", str(linked), candidate_head)
+        try:
+            candidate_approval = self.approval_files(repo=linked)[0]
+            self.assertFalse(candidate_approval.exists())
+
+            rc, out = self.run_request(repo=linked, review_cwd=self.repo)
+            self.assertEqual(rc, 0, out)
+            argv = json.loads((self.tools / "argv.json").read_text(encoding="utf-8"))
+            self.assertEqual(argv[argv.index("--base") + 1], previous["head"])
+            self.assertEqual(argv[argv.index("--head") + 1], candidate_head)
+
+            approval = json.loads(candidate_approval.read_text(encoding="utf-8"))
+            self.assertEqual(approval["head"], candidate_head)
+            self.assertEqual(approval["base"], previous["head"])
+            self.assertEqual(approval["previous_approval"]["approval_id"], previous["approval_id"])
+            self.assertEqual(approval["previous_approval"]["head"], previous["head"])
+            candidate_history = H.sdlc(linked) / ".pm-review" / "history"
+            self.assertTrue((candidate_history / f"approval-code-{previous['head'][:12]}.md").is_file())
+            self.assertTrue((candidate_history / f"approval-code-{candidate_head[:12]}.md").is_file())
+            self.assertEqual(self.pm_review_tree_bytes(self.repo), registered_before)
+            self.assertEqual(
+                json.loads(self.approval_files(repo=self.repo)[0].read_text(encoding="utf-8")),
+                previous,
+            )
+        finally:
+            H.git(self.repo, "worktree", "remove", "--force", str(linked))
+
+    def test_second_linked_candidate_cannot_mutate_first_candidates_history(self):
+        previous = self.approve_committed_baseline()
+        self.commit_code_and_evidence()
+        candidate_head = core.head(self.repo)
+        registered_before = self.pm_review_tree_bytes(self.repo)
+        first = self.tools / "first-incremental-candidate"
+        second = self.tools / "second-incremental-candidate"
+        H.git(self.repo, "worktree", "add", "--detach", str(first), candidate_head)
+        H.git(self.repo, "worktree", "add", "--detach", str(second), candidate_head)
+        try:
+            rc, out = self.run_request(repo=first, review_cwd=self.repo)
+            self.assertEqual(rc, 0, out)
+            first_approval = json.loads(self.approval_files(repo=first)[0].read_text(encoding="utf-8"))
+            self.assertEqual(first_approval["previous_approval"]["approval_id"], previous["approval_id"])
+            first_history_before = self.pm_review_tree_bytes(first)
+
+            rc, out = self.run_request(repo=second, review_cwd=self.repo)
+            self.assertEqual(rc, 0, out)
+            second_approval = json.loads(self.approval_files(repo=second)[0].read_text(encoding="utf-8"))
+            self.assertEqual(second_approval["previous_approval"]["approval_id"], previous["approval_id"])
+            self.assertTrue((H.sdlc(second) / ".pm-review" / "history" / f"approval-code-{candidate_head[:12]}.md").is_file())
+
+            self.assertEqual(self.pm_review_tree_bytes(first), first_history_before)
+            self.assertEqual(self.pm_review_tree_bytes(self.repo), registered_before)
+        finally:
+            H.git(self.repo, "worktree", "remove", "--force", str(first))
+            H.git(self.repo, "worktree", "remove", "--force", str(second))
+
+    def test_conflicting_candidate_history_refuses_without_mutating_registered_checkout(self):
+        previous = self.approve_committed_baseline()
+        self.commit_code_and_evidence()
+        candidate_head = core.head(self.repo)
+        registered_before = self.pm_review_tree_bytes(self.repo)
+        linked = self.tools / "conflicting-incremental-candidate"
+        H.git(self.repo, "worktree", "add", "--detach", str(linked), candidate_head)
+        try:
+            candidate_history = H.sdlc(linked) / ".pm-review" / "history"
+            candidate_history.mkdir(parents=True, exist_ok=True)
+            conflicting_path = candidate_history / f"approval-code-{previous['head'][:12]}.md"
+            conflicting_bytes = b"conflicting candidate approval history\n"
+            conflicting_path.write_bytes(conflicting_bytes)
+
+            rc, out = self.run_request(repo=linked, review_cwd=self.repo)
+            self.assertEqual(rc, 2, out)
+            self.assertIn("historical approval Markdown", out)
+            self.assertFalse(self.approval_files(repo=linked)[0].exists())
+            self.assertEqual(conflicting_path.read_bytes(), conflicting_bytes)
+            self.assertEqual(self.pm_review_tree_bytes(self.repo), registered_before)
+            self.assertEqual(
+                json.loads(self.approval_files(repo=self.repo)[0].read_text(encoding="utf-8")),
+                previous,
+            )
+        finally:
+            H.git(self.repo, "worktree", "remove", "--force", str(linked))
+
+    def test_incremental_approval_chain_progresses_a_to_b_to_c(self):
+        approval_a = self.approve_committed_baseline()
+        approval_b = self.approve_incremental_successor(approval_a["head"], "task-b.py")
+        self.assertEqual(
+            [record["approval_id"] for record in approval_b["approval_chain"]],
+            [approval_a["approval_id"]],
+        )
+
+        approval_c = self.approve_incremental_successor(approval_b["head"], "task-c.py")
+        argv = json.loads((self.tools / "argv.json").read_text(encoding="utf-8"))
+        self.assertEqual(argv[argv.index("--base") + 1], approval_b["head"])
+        self.assertEqual(
+            [record["approval_id"] for record in approval_c["approval_chain"]],
+            [approval_a["approval_id"], approval_b["approval_id"]],
+        )
+        self.assertEqual(approval_c["previous_approval"]["approval_id"], approval_b["approval_id"])
+        self.assertEqual(approval_c["head"], core.head(self.repo))
+
+    def test_missing_historical_a_markdown_invalidates_a_to_b_to_c_chain(self):
+        approval_a = self.approve_committed_baseline()
+        self.approve_incremental_successor(approval_a["head"], "task-b.py")
+        historical_a = H.sdlc(self.repo) / ".pm-review" / "history" / f"approval-code-{approval_a['head'][:12]}.md"
+        self.assertTrue(historical_a.is_file())
+        historical_a.unlink()
+        self.commit_code_and_evidence("task-c.py")
+
+        rc, out = self.run_request()
+        self.assertEqual(rc, 0, out)
+        argv = json.loads((self.tools / "argv.json").read_text(encoding="utf-8"))
+        self.assertEqual(argv[argv.index("--base") + 1], self.base)
+        current = json.loads(self.approval_files()[0].read_text(encoding="utf-8"))
+        self.assertEqual(current["base"], self.base)
+        self.assertIsNone(current["previous_approval"])
+        self.assertEqual(current["approval_chain"], [])
+
+    def test_corrupted_historical_b_markdown_invalidates_a_to_b_to_c_chain(self):
+        approval_a = self.approve_committed_baseline()
+        approval_b = self.approve_incremental_successor(approval_a["head"], "task-b.py")
+        historical_b = H.sdlc(self.repo) / ".pm-review" / "history" / f"approval-code-{approval_b['head'][:12]}.md"
+        self.assertTrue(historical_b.is_file())
+        historical_b.write_text("corrupted historical approval\n", encoding="utf-8")
+        self.commit_code_and_evidence("task-c.py")
+
+        rc, out = self.run_request()
+        self.assertEqual(rc, 0, out)
+        argv = json.loads((self.tools / "argv.json").read_text(encoding="utf-8"))
+        self.assertEqual(argv[argv.index("--base") + 1], self.base)
+        current = json.loads(self.approval_files()[0].read_text(encoding="utf-8"))
+        self.assertEqual(current["base"], self.base)
+        self.assertIsNone(current["previous_approval"])
+        self.assertEqual(current["approval_chain"], [])
+
+    def test_missing_predecessor_a_invalidates_otherwise_valid_b_chain(self):
+        approval_a = self.approve_committed_baseline()
+        self.approve_incremental_successor(approval_a["head"], "task-b.py")
+        prior_result = (
+            H.sdlc(self.repo) / ".pm-review" / f"result-code-{approval_a['head'][:12]}.json"
+        )
+        prior_result.unlink()
+        self.commit_code_and_evidence("task-c.py")
+
+        rc, out = self.run_request()
+        self.assertEqual(rc, 0, out)
+        argv = json.loads((self.tools / "argv.json").read_text(encoding="utf-8"))
+        self.assertEqual(argv[argv.index("--base") + 1], self.base)
+        current = json.loads(self.approval_files()[0].read_text(encoding="utf-8"))
+        self.assertEqual(current["base"], self.base)
+        self.assertIsNone(current["previous_approval"])
+        self.assertEqual(current["approval_chain"], [])
+
+    def test_mismatched_b_to_a_link_invalidates_incremental_chain(self):
+        approval_a = self.approve_committed_baseline()
+        approval_b = self.approve_incremental_successor(approval_a["head"], "task-b.py")
+        approval_path = self.approval_files()[0]
+        approval_b["previous_approval"]["approval_id"] = "mismatched-A"
+        approval_path.write_text(json.dumps(approval_b), encoding="utf-8")
+        self.commit_code_and_evidence("task-c.py")
+
+        rc, out = self.run_request()
+        self.assertEqual(rc, 0, out)
+        argv = json.loads((self.tools / "argv.json").read_text(encoding="utf-8"))
+        self.assertEqual(argv[argv.index("--base") + 1], self.base)
+        current = json.loads(approval_path.read_text(encoding="utf-8"))
+        self.assertEqual(current["base"], self.base)
+        self.assertIsNone(current["previous_approval"])
+        self.assertEqual(current["approval_chain"], [])
+
+    def test_duplicate_or_cyclic_approval_chain_falls_back_without_hanging(self):
+        approval_a = self.approve_committed_baseline()
+        approval_b = self.approve_incremental_successor(approval_a["head"], "task-b.py")
+        approval_path = self.approval_files()[0]
+        approval_b_record = {key: value for key, value in approval_b.items() if key != "approval_chain"}
+        approval_b["approval_chain"].append(approval_b_record)
+        approval_path.write_text(json.dumps(approval_b), encoding="utf-8")
+        self.commit_code_and_evidence("task-c.py")
+
+        rc, out = self.run_request()
+        self.assertEqual(rc, 0, out)
+        argv = json.loads((self.tools / "argv.json").read_text(encoding="utf-8"))
+        self.assertEqual(argv[argv.index("--base") + 1], self.base)
+        current = json.loads(approval_path.read_text(encoding="utf-8"))
+        self.assertEqual(current["base"], self.base)
+        self.assertIsNone(current["previous_approval"])
+        self.assertEqual(current["approval_chain"], [])
+
+    def test_corrupt_prior_prompt_falls_back_to_full_sprint_range(self):
+        previous = self.approve_committed_baseline()
+        prior_prompt = H.sdlc(self.repo) / ".pm-review" / f"prompt-code-{previous['head'][:12]}.txt"
+        prior_prompt.write_text("tampered prior review prompt\n", encoding="utf-8")
+        self.commit_code_and_evidence()
+
+        rc, out = self.run_request()
+        self.assertEqual(rc, 0, out)
+        argv = json.loads((self.tools / "argv.json").read_text(encoding="utf-8"))
+        self.assertEqual(argv[argv.index("--base") + 1], self.base)
+        approval = json.loads(self.approval_files()[0].read_text(encoding="utf-8"))
+        self.assertEqual(approval["base"], self.base)
+        self.assertIsNone(approval["previous_approval"])
+
+    def test_malformed_prior_artifacts_fall_back_to_full_sprint_range(self):
+        self.approve_committed_baseline()
+        approval_path = self.approval_files()[0]
+        prior = json.loads(approval_path.read_text(encoding="utf-8"))
+        prior["artifacts"] = ["not", "an", "artifact-map"]
+        approval_path.write_text(json.dumps(prior), encoding="utf-8")
+        self.commit_code_and_evidence()
+
+        rc, out = self.run_request()
+        self.assertEqual(rc, 0, out)
+        argv = json.loads((self.tools / "argv.json").read_text(encoding="utf-8"))
+        self.assertEqual(argv[argv.index("--base") + 1], self.base)
+        current = json.loads(approval_path.read_text(encoding="utf-8"))
+        self.assertEqual(current["base"], self.base)
+        self.assertIsNone(current["previous_approval"])
+
+    def test_oversized_prepared_prompt_is_refused_before_review_send(self):
+        calls = self.tools / "review-calls.txt"
+        with mock.patch.object(pm_review, "MAX_REVIEW_PROMPT_BYTES", 64):
+            rc, out = self.run_request(calls_out=str(calls))
+        self.assertEqual(rc, 2)
+        self.assertIn("safe limit is 64", out)
+        self.assertEqual(calls.read_text(encoding="utf-8").splitlines(), ["dump"])
+        self.assertFalse(self.approval_files()[0].exists())
+        self.assertFalse(self.approval_files()[1].exists())
+
     def test_full_approve_writes_bound_approval_and_verifies(self):
         rc, out = self.run_request()
         self.assertEqual(rc, 0, out)
