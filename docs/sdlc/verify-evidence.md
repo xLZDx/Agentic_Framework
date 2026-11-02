@@ -30,6 +30,16 @@ See the not_run list in verify-evidence.json (real PM Bridge dump mode, real sch
 - Test-role runtime did not expose its model ID or reasoning effort; no model or effort is inferred here.
 - `CI`: `NOT_RUN` because the operator prohibited CI. A Python reviewer accidentally invoked `git diff --check`; it emitted no output and made no changes.
 
+## Task-scoped review provenance remediation (2026-11-02)
+- GPT-PM review of the earlier task-scoped route returned `MAJOR` at `6caf6fdf65e19208e394da30d0f1d2b3325c2aef`: committed `task_acceptance_records` were caller-controlled and could not prove predecessor acceptance.
+- Remediation commit: `69d2d32c4d47c7cb181b005ab89893f527e34b61`. The route no longer treats those records as authority. Task identifiers are labels; task-scoped review requires a valid official PM approval at the exact task base and verifies the full approval chain through current HEAD.
+- Internal review: Python reviewer reported no concrete findings. Security reviewer confirmed task labels and task-head records are not acceptance proof and the exact-base official approval remains the trust anchor.
+- Focused test command: `python -m unittest discover -s tests -p test_pm_review.py`; final result: 49 passed, 0 failed, 0 errors, 0 skipped, 350.678s; exit 0; run by `functional-test-reviewer`.
+- The test ran with repository HEAD `6caf6fdf65e19208e394da30d0f1d2b3325c2aef` and working diff SHA-256 `c788f0b444a99d53796e50e7006395fdcc7da525645088ba30b1b51bbce421fe`. That exact patch SHA matched the committed diff `6caf6fdf65e19208e394da30d0f1d2b3325c2aef..69d2d32c4d47c7cb181b005ab89893f527e34b61`.
+- The first run on a preceding test-fixture revision produced 48 passed / 1 failed because the test omitted exact task-head metadata and hit an earlier refusal. The fixture was corrected; the final run above passed. Repeated `ResourceWarning`s from `tools/af/core.py:98` remained non-fatal.
+- The initial GPT-PM retry at HEAD `69d2d32c4d47c7cb181b005ab89893f527e34b61` was refused before dispatch because this evidence file still referenced the prior tested head; evidence is now updated. No new GPT-PM decision has been received yet.
+- `CI`: `NOT_RUN`; operator prohibited CI.
+
 ## Curated agents change (change 0012, remediation of round 7)
 - Earlier complete run `full15.log`: 355 tests, 9 failures (7 outdated expectations, 2 forbidden wording); all fixed.
 - Focused re-run after those fixes: `test_curated`, `test_deploy`, `test_deploy_imported` = 41/41 (`sub17.log`); after round 7 remediation five affected files = 77 tests, 76 OK, 1 self-skip (`sub19.log`).

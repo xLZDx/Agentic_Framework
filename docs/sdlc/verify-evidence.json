@@ -1,5 +1,5 @@
 {
-  "tested_head": "9f27fcd4745aff7310679d948ddd8eca8ff7e674",
+  "tested_head": "69d2d32c4d47c7cb181b005ab89893f527e34b61",
   "runs": [
     {
       "command": "python -m unittest -v test_curated test_deploy test_deploy_imported test_af_install test_externals (cwd tests)",
@@ -18,6 +18,20 @@
       "errors": 0,
       "skipped": 0,
       "test_owner": "functional-test-reviewer",
+      "test_model": "UNAVAILABLE: execution record did not expose model ID",
+      "test_effort": "UNAVAILABLE: execution record did not expose reasoning effort"
+    },
+    {
+      "command": "python -m unittest discover -s tests -p test_pm_review.py",
+      "total": 49,
+      "passed": 49,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "test_owner": "functional-test-reviewer",
+      "tested_head": "69d2d32c4d47c7cb181b005ab89893f527e34b61",
+      "execution_head": "6caf6fdf65e19208e394da30d0f1d2b3325c2aef",
+      "execution_diff_sha256": "c788f0b444a99d53796e50e7006395fdcc7da525645088ba30b1b51bbce421fe",
       "test_model": "UNAVAILABLE: execution record did not expose model ID",
       "test_effort": "UNAVAILABLE: execution record did not expose reasoning effort"
     }
