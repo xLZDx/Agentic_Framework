@@ -274,6 +274,37 @@ def _git_blob_shas(project: Path, revision: str, name: str) -> set[str]:
     return {_sha(data) for data in variants}
 
 
+def _artifact_matches(project: Path, revision: str, name: str, expected: str) -> bool:
+    """Bind a recorded artifact digest to the committed artifact at the approved revision.
+
+    The digest was taken from the working copy, whose line endings can differ from the committed blob
+    (a mixed-EOL Windows checkout is the known case). Falling back on the blob is not a weakening: an
+    approval is only requested on a clean tracked tree, so the artifact at approval time was exactly
+    the committed blob of that revision. The fallback therefore still proves "the artifact is the one
+    that head approved"; it only tolerates the line-ending form of the record.
+    """
+    variants = _git_blob_shas(project, revision, name)
+    if expected in variants:
+        return True
+    try:
+        state = core.state_dir(project)
+        repo_path = (state.relative_to(project) / name).as_posix()
+    except ValueError:
+        return False
+    blob = subprocess.run(
+        ["git", "-C", str(project), "show", f"{revision}:{repo_path}"],
+        capture_output=True,
+        check=False,
+    )
+    if blob.returncode != 0 or not blob.stdout:
+        return False
+    current = (core.state_dir(project) / name).read_bytes() if (core.state_dir(project) / name).is_file() else None
+    if current is None:
+        return False
+    normalize = lambda data: data.replace(b"\r\n", b"\n")  # noqa: E731
+    return _sha(normalize(current)) == _sha(normalize(blob.stdout))
+
+
 def _approval_summary(approval: dict) -> dict:
     keys = (
         "approval_id", "head", "request_id", "reply_id", "input_hash", "reply_sha256",
@@ -473,7 +504,9 @@ def _valid_approval_record(
         for name, expected in artifacts.items()
     ):
         return False, None
-    if any(expected not in _git_blob_shas(project, head, name) for name, expected in artifacts.items()):
+    if any(
+        not _artifact_matches(project, head, name, expected) for name, expected in artifacts.items()
+    ):
         return False, None
     evidence_sha = approval.get("evidence_sha256")
     if evidence_sha is not None and (

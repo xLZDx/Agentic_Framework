@@ -29,6 +29,21 @@ class Verify(unittest.TestCase):
         self.assertTrue(ok)
         self.assertIn(h, why)
 
+    def test_artifact_digest_tolerates_line_endings_only_when_blob_matches(self):
+        rel = "change-records/c.md"
+        path = H.sdlc(self.repo) / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"one\ntwo\n")
+        H.git(self.repo, "add", "docs/sdlc/" + rel)
+        H.git(self.repo, "commit", "-q", "-m", "add change record")
+        head = core.head(self.repo)
+        mixed = b"one\r\ntwo\n"  # legacy working copy whose record was hashed before normalisation
+        expected = hashlib.sha256(mixed).hexdigest()
+
+        self.assertTrue(pm_review._artifact_matches(self.repo, head, rel, expected))
+        path.write_bytes(b"one\ntwo changed\n")
+        self.assertFalse(pm_review._artifact_matches(self.repo, head, rel, expected))
+
     def test_new_commit_invalidates(self):
         H.write_approval(self.repo)
         H.commit_file(self.repo)
