@@ -7,7 +7,7 @@ Sprint: framework-maintenance
 - `tests/test_pm_review.py`: `test_packet_bounds_evidence_and_keeps_digests`.
 
 ## Why
-The PM transport converts a payload above roughly 114k characters into a `Pasted text` attachment. In this environment the reviewer cannot read that attachment, so a 357k-character PDCC packet produced "файл недоступен" instead of a verdict and blocked the review. Bounding the evidence keeps the request inline (83,976 characters in the reproduced PDCC case) while keeping the reviewed delta, the exact head and every evidence digest intact.
+The PM transport converts a payload above roughly 114k characters into a `Pasted text` attachment. In this environment the reviewer cannot read that attachment, so a 357k-character PDCC packet produced "файл недоступен" instead of a verdict and blocked the review. Bounding the evidence keeps the request inline (14,288 characters in the reproduced PDCC case) while keeping the reviewed delta, the exact head and every evidence digest intact.
 
 ## Limits
 - Truncation is visible, so a reviewer can demand the full file; the marker names the path and the digest.
