@@ -1,26 +1,30 @@
 {
-  "tested_head": "e8b3baaeb853b292c74331d06070b2f93c0b8f19",
+  "tested_head": "6c139cea179d6290cf27ca6546ccde33a65c32b6",
   "runs": [
     {
-      "command": "python -m unittest discover -s tests -p test_pm_review.py -v (cwd D:\\Repo\\Agentic_Framework\\.worktrees\\pm-review-routing-candidate, HEAD e8b3baaeb853b292c74331d06070b2f93c0b8f19)",
+      "command": "python -m unittest discover -s tests -p test_pm_review.py -v (cwd D:\\Repo\\Agentic_Framework\\.worktrees\\pm-review-routing, HEAD 6c139cea179d6290cf27ca6546ccde33a65c32b6)",
+      "total": 56,
+      "passed": 56,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "log": "C:\\Users\\koros\\AppData\\Local\\Temp\\af-pm-review-6c139ce-unittest.log (Ran 56 tests in 836.660 s, result OK, sha256 A95ED03D4A7CF0BFD746715D3E219DAD7B393E895B4DADDFD321C726A242DBED); non-fatal ResourceWarning from tools/af/core.py:98"
+    },
+    {
+      "command": "python -m unittest discover -s tests -p test_pm_review.py -v (clean candidate worktree, HEAD e8b3baaeb853b292c74331d06070b2f93c0b8f19) - historical",
       "total": 54,
       "passed": 54,
       "failed": 0,
       "errors": 0,
       "skipped": 0,
-      "log": "C:\\Users\\koros\\AppData\\Local\\Temp\\af-pm-review-e8b3baa-unittest.log (Ran 54 tests in 939.462 s, result OK, sha256 4AD6AEA751FEBFD46FC0759CB5CD3D4233EA67D75311054E6DF0479E97F6F944); non-fatal ResourceWarning from tools/af/core.py:98"
-    },
-    {
-      "command": "python -m unittest -v <18 affected files> (cwd tests) - historical run at head 5e5416783bade87e5c1d6c4ac5848a408f43d7e4",
-      "total": 392,
-      "passed": 391,
-      "failed": 0,
-      "errors": 0,
-      "skipped": 1,
-      "log": "sub20.log (739 s)"
+      "log": "af-pm-review-e8b3baa-unittest.log, Ran 54 tests in 939.462 s, OK"
     }
   ],
   "not_run": [
+    {
+      "item": "complete Agentic_Framework suite on the candidate tree 6c139ce",
+      "reason": "only the affected file tests/test_pm_review.py was re-run at the exact head (56/56); operator rule keeps complete-suite re-runs out of scope"
+    },
     {
       "item": "complete suite on the final tree",
       "reason": "last complete run full15.log (355 tests) had 9 failures, 7 outdated expectations and 2 forbidden-wording hits, all fixed; per operator instruction only the three affected test files were re-run, the other files were not re-run after the fixes"
@@ -50,16 +54,8 @@
       "reason": "NOT_RUN: operator prohibited CI"
     },
     {
-      "item": "complete Agentic_Framework suite on the candidate tree e8b3baa",
-      "reason": "only the affected file tests/test_pm_review.py was re-run at the exact head (54/54); operator rule keeps complete-suite re-runs out of scope"
-    },
-    {
       "item": "GitHub CI on the candidate commit",
       "reason": "no CI workflow was started for this change; the operator prohibits CI runs in this cycle"
-    },
-    {
-      "item": "complete Agentic_Framework suite on the candidate tree e8b3baa",
-      "reason": "only the affected file tests/test_pm_review.py was re-run at the exact head (54/54); operator rule keeps complete-suite re-runs out of scope"
     },
     {
       "item": "GitHub CI on the candidate commit",
@@ -91,7 +87,7 @@
     }
   ],
   "pm_review_routing_change": {
-    "candidate_head": "e8b3baaeb853b292c74331d06070b2f93c0b8f19",
+    "candidate_head": "6c139cea179d6290cf27ca6546ccde33a65c32b6",
     "candidate_parent": "9c21daff9d6b3d330dc95b7bab9c69045b627ddd",
     "sprint_base": "164d300e487c2165b7b355e0e9322b0e31acdfd3",
     "source_test_diff_paths": [
@@ -102,7 +98,9 @@
     "source_test_diff_bytes": 25655,
     "purpose": "let an official task-scoped PM review root at the committed sprint baseline when no prior approval exists, binding the baseline to the committed state.json sprint/start_head",
     "previous_approval": "PMG-20261102-9c21daff covers head 9c21daf only; it does not cover e8b3baa",
-    "exact_head_test_status": "PASS 54/54 at e8b3baa; the interrupted prior attempt produced no result",
-    "official_pm_review_at_candidate": "PENDING at this revision"
+    "exact_head_test_status": "PASS 56/56 at 6c139ce; earlier 54/54 at e8b3baa is historical",
+    "official_pm_review_at_candidate": "Requested after this evidence commit; no approval recorded yet",
+    "round2_finding": "PM review 82014858-e5aa-47bc-8004-853225d65b86 returned MAJOR: the baseline came from mutable current-HEAD state.json, so a committed redefinition could shrink a first-task review range",
+    "round2_fix": "baseline must equal the start_head of the earliest commit that introduced the sprint id, that baseline must precede the creation commit, and the creation commit must precede the reviewed HEAD"
   }
 }

@@ -14,6 +14,7 @@ Sprint: framework-maintenance
 Task-scoped reviews could only chain from an existing official approval, so the first task of a sprint could not be reviewed against its own diff when the sprint had no approval yet, and a hand-edited or synthetic task-acceptance record could redirect the review range. Rooting the chain at the committed sprint baseline keeps the exact task diff visible to GPT-PM while binding the anchor to committed project state.
 
 ## Verification
+- Round-2 exact HEAD `6c139cea179d6290cf27ca6546ccde33a65c32b6`: `python -m unittest discover -s tests -p test_pm_review.py -v` = 56 tests, 56 passed, 0 failed, 0 errors, 0 skipped, `Ran 56 tests in 836.660s`, `OK` (log `af-pm-review-6c139ce-unittest.log`, sha256 `A95ED03D4A7CF0BFD746715D3E219DAD7B393E895B4DADDFD321C726A242DBED`).
 - `functional-test-reviewer` exact-HEAD rerun on the clean candidate worktree: `python -m unittest discover -s tests -p test_pm_review.py -v` = 54 tests, 54 passed, 0 failed, 0 errors, 0 skipped, `Ran 54 tests in 939.462s`, `OK` (log `af-pm-review-e8b3baa-unittest.log`, sha256 `4AD6AEA751FEBFD46FC0759CB5CD3D4233EA67D75311054E6DF0479E97F6F944`). The earlier interrupted attempt produced no result and is not claimed.
 - Source/test diff identity: `git diff 9c21daff9d6b3d330dc95b7bab9c69045b627ddd e8b3baaeb853b292c74331d06070b2f93c0b8f19 -- tools/af/pm_review.py tests/test_pm_review.py`, 25,655 bytes, sha256 `d0c25afe48ea12dd25e36d96241538729589b04c15e600790250771bec1564b3`.
 - Read-only `python-reviewer` and `security-reviewer` passes on that diff: no actionable finding.
