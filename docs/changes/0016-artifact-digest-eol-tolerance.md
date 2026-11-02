@@ -17,5 +17,5 @@ An earlier revision of this fix compared the working copy with the blob and igno
 
 ## Verification
 - Focused: `python -m unittest discover -s tests -p test_pm_review.py -k artifact_digest_requires` = 1 passed.
-- Full affected-file rerun at the exact commit is recorded in `docs/sdlc/verify-evidence.json` and `verify-evidence.md`.
+- Full affected-file rerun at `5568d16ce2daf0839c66ef38545346d270c878e2`: 57 tests, 57 passed, 0 failed, 0 errors, 0 skipped, `Ran 57 tests in 1132.227s`, `OK` (log `af-pm-review-5568d16-unittest.log`, sha256 68dd2e95a565e1c8a0ed42937065a1cdf24f7c219e8114752d0c6f1c47674935).
 - NOT_RUN: complete framework suite, GitHub CI.
