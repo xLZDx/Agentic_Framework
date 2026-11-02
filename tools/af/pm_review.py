@@ -23,6 +23,11 @@ DIFF_OPEN = "Diff:\n```diff\n"
 # PM Bridge's 4 MiB request limit includes a JSON wrapper around this prompt.
 MAX_REVIEW_PROMPT_BYTES = 3_800_000
 MAX_APPROVAL_CHAIN = 128
+# The review transport turns payloads above roughly 114k characters into a "Pasted text" attachment
+# that the reviewer may be unable to read, so the evidence section is bounded and labelled. The diff
+# itself is never truncated.
+MAX_EVIDENCE_CHARS_PER_FILE = 12_000
+MAX_EVIDENCE_CHARS_TOTAL = 80_000
 
 
 def _paths(project: Path, kind: str) -> tuple[Path, Path]:
@@ -203,10 +208,22 @@ def build_packet(
         )
     names = ["verify-evidence.json", "verify-evidence.md", "review-record.md", "test-plan.md",
              "requirements.md", "backlog.md", "design.md"]
+    budget = MAX_EVIDENCE_CHARS_TOTAL
     for name in names:
         f = sd / name
-        if f.is_file():
-            parts.append(f"\n## Evidence file: {name} (sha256 {_sha(f.read_bytes())})\n{f.read_text(encoding='utf-8', errors='replace')}")
+        if not f.is_file() or budget <= 0:
+            continue
+        raw_bytes = f.read_bytes()
+        body = raw_bytes.decode("utf-8", errors="replace")
+        limit = min(MAX_EVIDENCE_CHARS_PER_FILE, budget)
+        if len(body) > limit:
+            body = (
+                body[:limit]
+                + f"\n\n[... truncated {len(body) - limit} of {len(body)} characters of {name}; "
+                f"full file at {f}, sha256 {_sha(raw_bytes)} ...]"
+            )
+        budget -= min(len(body), limit)
+        parts.append(f"\n## Evidence file: {name} (sha256 {_sha(raw_bytes)})\n{body}")
     return "\n".join(parts)
 
 
