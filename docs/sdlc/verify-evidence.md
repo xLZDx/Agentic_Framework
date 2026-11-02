@@ -22,6 +22,14 @@ See the not_run list in verify-evidence.json (real PM Bridge dump mode, real sch
 - Text-based push detection is best effort; the git pre-push hook is the boundary.
 - `status` does not yet print the exact artifact requirements (backlog item 1).
 
+## Task-scoped PM review routing (2026-11-02)
+- Code candidate: `9f27fcd4745aff7310679d948ddd8eca8ff7e674`; test command: `python -m unittest discover -s tests -p test_pm_review.py`; exact-HEAD result: 46 passed, 0 failed, 0 errors, 0 skipped.
+- The run emitted repeated `ResourceWarning` messages from `tools/af/core.py:98` for fixture `docs/sdlc` files; the run still exited 0.
+- Earlier runs on the same focused set exposed two fixture failures. The fixtures created phase artifacts without committing them, so historical approval validation correctly refused artifact hashes absent from the reviewed HEAD. The fixtures now commit their baseline artifacts and exercise a prior approved HEAD before the task-scoped approval.
+- Final Python review: no remaining findings. The reviewer runtime did not expose its model ID or reasoning effort.
+- Test-role runtime did not expose its model ID or reasoning effort; no model or effort is inferred here.
+- `CI`: `NOT_RUN` because the operator prohibited CI. A Python reviewer accidentally invoked `git diff --check`; it emitted no output and made no changes.
+
 ## Curated agents change (change 0012, remediation of round 7)
 - Earlier complete run `full15.log`: 355 tests, 9 failures (7 outdated expectations, 2 forbidden wording); all fixed.
 - Focused re-run after those fixes: `test_curated`, `test_deploy`, `test_deploy_imported` = 41/41 (`sub17.log`); after round 7 remediation five affected files = 77 tests, 76 OK, 1 self-skip (`sub19.log`).

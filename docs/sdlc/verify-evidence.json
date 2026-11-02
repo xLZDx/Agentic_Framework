@@ -1,5 +1,5 @@
 {
-  "tested_head": "645f620c7240a0ea27f451747f7a8f02d57efbd6",
+  "tested_head": "9f27fcd4745aff7310679d948ddd8eca8ff7e674",
   "runs": [
     {
       "command": "python -m unittest -v test_curated test_deploy test_deploy_imported test_af_install test_externals (cwd tests)",
@@ -9,6 +9,17 @@
       "errors": 0,
       "skipped": 1,
       "log": "sub19.log (61 s)"
+    },
+    {
+      "command": "python -m unittest discover -s tests -p test_pm_review.py",
+      "total": 46,
+      "passed": 46,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "test_owner": "functional-test-reviewer",
+      "test_model": "UNAVAILABLE: execution record did not expose model ID",
+      "test_effort": "UNAVAILABLE: execution record did not expose reasoning effort"
     }
   ],
   "not_run": [
@@ -35,6 +46,10 @@
     {
       "item": "mutation checks",
       "reason": "not run by operator policy"
+    },
+    {
+      "item": "CI",
+      "reason": "NOT_RUN: operator prohibited CI"
     }
   ],
   "findings": {
@@ -47,6 +62,18 @@
       "model": "sonnet",
       "effort": "medium",
       "verdict": "affected files 76/77 green, 1 self-skip; round 7 findings fixed; no open product bugs"
+    },
+    {
+      "role": "functional-test-reviewer",
+      "model": "UNAVAILABLE: execution record did not expose model ID",
+      "effort": "UNAVAILABLE: execution record did not expose reasoning effort",
+      "verdict": "46/46 passed on exact HEAD 9f27fcd4745aff7310679d948ddd8eca8ff7e674"
+    },
+    {
+      "role": "python-reviewer",
+      "model": "UNAVAILABLE: reviewer runtime did not expose model ID",
+      "effort": "UNAVAILABLE: reviewer runtime did not expose reasoning effort",
+      "verdict": "NO_FINDINGS: no remaining issues in final diff"
     }
   ]
 }
