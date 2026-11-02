@@ -37,32 +37,77 @@ def _sha(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def _trusted_sprint_start(project: Path, revision: str) -> str | None:
-    """Resolve a sprint baseline only when it matches the committed project state."""
+def _state_at(project: Path, revision: str) -> dict | None:
+    """Read the committed docs/sdlc/state.json at one revision; None when absent or invalid."""
     try:
-        working_state = core.read_state(project)
         state_path = (core.state_dir(project) / "state.json").relative_to(project).as_posix()
-        committed = subprocess.run(
+        result = subprocess.run(
             ["git", "-C", str(project), "show", f"{revision}:{state_path}"],
             capture_output=True, check=False,
         )
-        if committed.returncode != 0 or not isinstance(working_state, dict):
-            return None
-        committed_state = json.loads(committed.stdout)
-        if not isinstance(committed_state, dict):
-            return None
-        start_head = committed_state.get("start_head")
-        if (
-            not isinstance(working_state, dict)
-            or working_state.get("sprint_id") != committed_state.get("sprint_id")
-            or working_state.get("start_head") != start_head
-        ):
-            return None
-        if not isinstance(start_head, str) or not start_head:
-            return None
-        return core.git(project, "rev-parse", "--verify", f"{start_head}^{{commit}}").strip()
+    except (OSError, ValueError):
+        return None
+    if result.returncode != 0:
+        return None
+    try:
+        data = json.loads(result.stdout)
+    except ValueError:
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _sprint_creation(project: Path, revision: str, sprint_id: str) -> tuple[str, dict] | None:
+    """Earliest commit that introduced this sprint id into the committed state.json."""
+    try:
+        state_path = (core.state_dir(project) / "state.json").relative_to(project).as_posix()
+        commits = core.git(
+            project, "log", "--reverse", "--format=%H", "-S", sprint_id, revision, "--", state_path,
+        ).split()
     except (OSError, RuntimeError, ValueError):
         return None
+    for commit in commits:
+        recorded = _state_at(project, commit)
+        if recorded is not None and recorded.get("sprint_id") == sprint_id:
+            return commit, recorded
+    return None
+
+
+def _trusted_sprint_start(project: Path, revision: str) -> str | None:
+    """Resolve a sprint baseline only from the committed sprint-creation record.
+
+    Current-HEAD metadata alone is not authoritative: a later commit could redefine start_head and
+    shrink the reviewed range. The declared baseline must equal the state.json that first
+    introduced this sprint id, and that creation record must descend from the declared start HEAD.
+    """
+    working_state = core.read_state(project)
+    committed_state = _state_at(project, revision)
+    if not isinstance(working_state, dict) or not isinstance(committed_state, dict):
+        return None
+    sprint_id = committed_state.get("sprint_id")
+    start_head = committed_state.get("start_head")
+    if not isinstance(sprint_id, str) or not sprint_id.strip():
+        return None
+    if not isinstance(start_head, str) or not start_head:
+        return None
+    if working_state.get("sprint_id") != sprint_id or working_state.get("start_head") != start_head:
+        return None
+    creation = _sprint_creation(project, revision, sprint_id)
+    if creation is None or creation[1].get("start_head") != start_head:
+        return None
+    try:
+        start_sha = core.git(project, "rev-parse", "--verify", f"{start_head}^{{commit}}").strip()
+        creation_sha = core.git(project, "rev-parse", "--verify", f"{creation[0]}^{{commit}}").strip()
+    except (OSError, RuntimeError, ValueError):
+        return None
+    if subprocess.run(
+        ["git", "-C", str(project), "merge-base", "--is-ancestor", start_sha, creation_sha]
+    ).returncode != 0:
+        return None
+    if subprocess.run(
+        ["git", "-C", str(project), "merge-base", "--is-ancestor", creation_sha, revision]
+    ).returncode != 0:
+        return None
+    return start_sha
 
 
 def _valid_task_scope(project: Path, scope: dict, candidate_head: str, sprint_base_sha: str) -> bool:

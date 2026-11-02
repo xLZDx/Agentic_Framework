@@ -257,6 +257,50 @@ class Request(unittest.TestCase):
         self.assertIn("recorded sprint start HEAD", out)
         self.assertFalse(self.approval_files()[0].exists())
 
+    def test_task_scoped_root_refuses_redefined_sprint_start(self):
+        self.commit_sprint_baseline()
+        later = H.commit_file(self.repo, "later.py", "later\n")
+        state = core.read_state(self.repo)
+        state["start_head"] = later
+        core.write_state(self.repo, state)
+        H.git(self.repo, "add", "docs/sdlc")
+        H.git(self.repo, "commit", "-q", "-m", "redefine the sprint baseline")
+        task_head = self.commit_code_and_evidence()
+        self.add_task_scope_evidence(task_head, later)
+
+        rc, out = self.run_request(task_base=later, task_id="DEC-01-T06",
+                                   predecessor_task="DEC-01-T05")
+        self.assertEqual(rc, 2, out)
+        self.assertIn("requires --base to match the recorded sprint start HEAD", out)
+        self.assertFalse(self.approval_files()[0].exists())
+
+    def test_task_scoped_root_refuses_baseline_absent_from_creation_record(self):
+        repo = H.make_repo(self)
+        H.commit_file(repo, "a.txt")
+        H.set_state(repo, phase=8)
+        H.stamp_phases_1_7(repo)
+        H.write_evidence(repo)
+        H.git(repo, "add", "docs/sdlc")
+        H.git(repo, "commit", "-q", "-m", "commit sprint artifacts without a baseline")
+        declared = H.commit_file(repo, "code.py", "changed\n")
+        H.write_evidence(repo, tested_head=declared)
+        state = core.read_state(repo)
+        state["start_head"] = declared
+        core.write_state(repo, state)
+        H.git(repo, "add", "docs/sdlc")
+        H.git(repo, "commit", "-q", "-m", "declare the sprint baseline after creation")
+        path = H.sdlc(repo) / "verify-evidence.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data["task_exact_heads"] = {"DEC-01-T06": {"head": core.head(repo)}}
+        path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+        H.git(repo, "add", "docs/sdlc/verify-evidence.json")
+        H.git(repo, "commit", "-q", "-m", "record accepted task scope evidence")
+
+        rc, out = self.run_request(repo=repo, base=declared, task_base=declared,
+                                   task_id="DEC-01-T06", predecessor_task="DEC-01-T05")
+        self.assertEqual(rc, 2, out)
+        self.assertIn("requires --base to match the recorded sprint start HEAD", out)
+
     def test_task_scoped_review_refuses_untracked_state_blob(self):
         state_path = H.sdlc(self.repo) / "state.json"
         state_bytes = state_path.read_bytes()

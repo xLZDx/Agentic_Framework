@@ -18,3 +18,9 @@ Task-scoped reviews could only chain from an existing official approval, so the 
 - Source/test diff identity: `git diff 9c21daff9d6b3d330dc95b7bab9c69045b627ddd e8b3baaeb853b292c74331d06070b2f93c0b8f19 -- tools/af/pm_review.py tests/test_pm_review.py`, 25,655 bytes, sha256 `d0c25afe48ea12dd25e36d96241538729589b04c15e600790250771bec1564b3`.
 - Read-only `python-reviewer` and `security-reviewer` passes on that diff: no actionable finding.
 - NOT_RUN: complete framework suite on this tree, GitHub CI, push (pending the official `af_cli.py pm-review` approval bound to this HEAD).
+
+
+## Round 2 hardening (PM review MAJOR-01, request `82014858-e5aa-47bc-8004-853225d65b86`)
+- Finding: the baseline came from the mutable `docs/sdlc/state.json` at the candidate HEAD, so a later commit could redefine `start_head` and shrink a first-task review range.
+- Fix: `_trusted_sprint_start()` now resolves the sprint via `_sprint_creation()` — the earliest commit that introduced the sprint id into the committed `state.json` (`git log --reverse -S<sprint_id> <head> -- docs/sdlc/state.json`). The declared `start_head` must equal the creation record's `start_head`, that baseline must be an ancestor of the creation commit, and the creation commit must be an ancestor of the reviewed HEAD. `_state_at()` reads the committed state at any revision.
+- Regression tests: `test_task_scoped_root_refuses_redefined_sprint_start` (baseline rewritten and committed, then used as `--base`: refused) and `test_task_scoped_root_refuses_baseline_absent_from_creation_record` (baseline declared only after sprint creation: refused).
