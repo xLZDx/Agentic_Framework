@@ -169,7 +169,9 @@ def cmd_mode(args) -> int:
 def cmd_pm_review(args) -> int:
     return pm_review.request(_project(args), args.kind, args.base, node=args.node,
                              project_id=args.project_id,
-                             review_cwd=Path(args.review_cwd).resolve() if args.review_cwd else None)
+                             review_cwd=Path(args.review_cwd).resolve() if args.review_cwd else None,
+                             task_base=args.task_base, task_id=args.task_id,
+                             predecessor_task=args.predecessor_task)
 
 
 def cmd_verify(args) -> int:
@@ -232,7 +234,7 @@ def main(argv=None) -> int:
     s = sub.add_parser("on"); s.add_argument("--mode", default=None, choices=["hard", "soft"]); s.add_argument("--title", default="Sprint"); s.set_defaults(fn=cmd_on)
     sub.add_parser("off").set_defaults(fn=cmd_off)
     sub.add_parser("migrate").set_defaults(fn=cmd_migrate)
-    s = sub.add_parser("pm-review"); s.add_argument("--kind", choices=list(pm_review.KINDS), default="code"); s.add_argument("--base", required=True); s.add_argument("--node", default="node"); s.add_argument("--project-id"); s.add_argument("--review-cwd", help="registered primary checkout used for PM Bridge routing (must share the candidate's Git common directory)"); s.set_defaults(fn=cmd_pm_review)
+    s = sub.add_parser("pm-review"); s.add_argument("--kind", choices=list(pm_review.KINDS), default="code"); s.add_argument("--base", required=True); s.add_argument("--task-base", help="review only a task delta from a correlated accepted predecessor HEAD"); s.add_argument("--task-id", help="exact task identifier recorded in verify-evidence.json"); s.add_argument("--predecessor-task", help="accepted predecessor task recorded in verify-evidence.json"); s.add_argument("--node", default="node"); s.add_argument("--project-id"); s.add_argument("--review-cwd", help="registered primary checkout used for PM Bridge routing (must share the candidate's Git common directory)"); s.set_defaults(fn=cmd_pm_review)
     s = sub.add_parser("verify"); s.add_argument("--kind", choices=list(pm_review.KINDS), default="code"); s.set_defaults(fn=cmd_verify)
     sub.add_parser("hook").set_defaults(fn=cmd_hook)
     sub.add_parser("deploy").set_defaults(fn=cmd_deploy)

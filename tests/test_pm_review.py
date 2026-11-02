@@ -117,6 +117,9 @@ class Request(unittest.TestCase):
         repo = repo or self.repo
         base = opts.pop("base", None) or (H.first_commit(repo) if repo != self.repo else self.base)
         review_cwd = opts.pop("review_cwd", None)
+        task_base = opts.pop("task_base", None)
+        task_id = opts.pop("task_id", None)
+        predecessor_task = opts.pop("predecessor_task", None)
         cfg = {"result": result if result is not None else APPROVE,
                "argv_out": str(self.tools / "argv.json"), "packet_out": str(self.tools / "packet.md")}
         cfg.update(opts)
@@ -125,8 +128,132 @@ class Request(unittest.TestCase):
         with mock.patch.dict(os.environ, env):
             buf = io.StringIO()
             with contextlib.redirect_stdout(buf):
-                rc = pm_review.request(repo, kind, base, review_cwd=review_cwd)
+                rc = pm_review.request(repo, kind, base, review_cwd=review_cwd,
+                                       task_base=task_base, task_id=task_id,
+                                       predecessor_task=predecessor_task)
         return rc, buf.getvalue()
+
+    def add_task_scope_evidence(self, task_head, accepted_head, task_id="DEC-01-T06", predecessor_task="DEC-01-T05"):
+        path = H.sdlc(self.repo) / "verify-evidence.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data["task_exact_heads"] = {task_id: {"head": task_head}}
+        data["task_acceptance_records"] = {
+            predecessor_task: {
+                "status": "ACCEPTED", "accepted_head": accepted_head,
+                "request_id": "accepted-request", "reply_id": "accepted-reply",
+                "bridge_job_id": "accepted-job", "correlated": True,
+            }
+        }
+        path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+        H.git(self.repo, "add", "docs/sdlc/verify-evidence.json")
+        H.git(self.repo, "commit", "-q", "-m", "record accepted task scope evidence")
+
+    def test_explicit_task_scope_reviews_only_accepted_task_delta_and_binds_head(self):
+        accepted_head = H.commit_file(self.repo, "accepted-predecessor.py", "accepted\n")
+        task_head = self.commit_code_and_evidence()
+        self.add_task_scope_evidence(task_head, accepted_head)
+        candidate_head = core.head(self.repo)
+        rc, out = self.run_request(task_base=accepted_head, task_id="DEC-01-T06",
+                                   predecessor_task="DEC-01-T05")
+        self.assertEqual(rc, 0, out)
+
+        argv = json.loads((self.tools / "argv.json").read_text(encoding="utf-8"))
+        self.assertEqual(argv[argv.index("--base") + 1], accepted_head)
+        self.assertEqual(argv[argv.index("--head") + 1], candidate_head)
+        packet = (self.tools / "packet.md").read_text(encoding="utf-8")
+        self.assertIn("Explicit task-scoped review", packet)
+        self.assertIn("Task: DEC-01-T06", packet)
+        self.assertIn(f"Accepted predecessor: DEC-01-T05 at {accepted_head}", packet)
+        self.assertIn(f"Exact HEAD under review: {candidate_head}", packet)
+
+        approval = json.loads(self.approval_files()[0].read_text(encoding="utf-8"))
+        self.assertEqual(approval["head"], candidate_head)
+        self.assertEqual(approval["review_scope"]["id"], "DEC-01-T06")
+        self.assertEqual(approval["review_scope"]["base_sha"], accepted_head)
+        self.assertEqual(approval["review_scope"]["task_head"], task_head)
+        self.assertTrue(pm_review.verify(self.repo)[0])
+
+    def test_scoped_review_requires_correlated_accepted_predecessor_at_exact_base(self):
+        self.commit_code_and_evidence()
+        rc, out = self.run_request(task_base=self.base, task_id="DEC-01-T06",
+                                   predecessor_task="DEC-01-T05")
+        self.assertEqual(rc, 2)
+        self.assertIn("lacks a correlated accepted predecessor record", out)
+        self.assertFalse(self.approval_files()[0].exists())
+
+    def test_task_scope_refuses_later_edits_to_task_files(self):
+        accepted_head = H.commit_file(self.repo, "accepted-predecessor.py", "accepted\n")
+        task_head = self.commit_code_and_evidence("task.py")
+        self.add_task_scope_evidence(task_head, accepted_head)
+        latest_source_head = H.commit_file(self.repo, "task.py", "changed after recorded task head\n")
+        H.write_evidence(self.repo, tested_head=latest_source_head)
+        self.add_task_scope_evidence(task_head, accepted_head)
+
+        rc, out = self.run_request(task_base=accepted_head, task_id="DEC-01-T06",
+                                   predecessor_task="DEC-01-T05")
+        self.assertEqual(rc, 2)
+        self.assertIn("task-scope evidence or exact path range", out)
+        self.assertFalse(self.approval_files()[0].exists())
+
+    def test_task_scoped_approval_can_anchor_next_incremental_review(self):
+        H.git(self.repo, "add", "docs/sdlc")
+        H.git(self.repo, "commit", "-q", "-m", "commit baseline SDLC evidence")
+        predecessor_source = H.commit_file(self.repo, "accepted-predecessor.py", "accepted\n")
+        H.write_evidence(self.repo, tested_head=predecessor_source)
+        H.git(self.repo, "add", "accepted-predecessor.py", "docs/sdlc/verify-evidence.json")
+        H.git(self.repo, "commit", "-q", "-m", "commit predecessor evidence baseline")
+        accepted_head = core.head(self.repo)
+
+        rc, out = self.run_request()
+        self.assertEqual(rc, 0, out)
+        previous = json.loads(self.approval_files()[0].read_text(encoding="utf-8"))
+        self.assertEqual(previous["head"], accepted_head)
+
+        acceptance_records = {
+            "DEC-01-T05": {
+                "status": "ACCEPTED", "accepted_head": accepted_head,
+                "request_id": "accepted-request", "reply_id": "accepted-reply",
+                "bridge_job_id": "accepted-job", "correlated": True,
+            }
+        }
+        evidence_path = H.sdlc(self.repo) / "verify-evidence.json"
+        evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+        evidence["task_acceptance_records"] = acceptance_records
+        evidence_path.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
+        H.git(self.repo, "add", "docs/sdlc/verify-evidence.json")
+        H.git(self.repo, "commit", "-q", "-m", "record accepted predecessor decision")
+
+        task_source = H.commit_file(self.repo, "task.py", "changed\n")
+        H.write_evidence(self.repo, tested_head=task_source,
+                         task_acceptance_records=acceptance_records)
+        H.git(self.repo, "add", "docs/sdlc/verify-evidence.json")
+        H.git(self.repo, "commit", "-q", "-m", "record task implementation evidence")
+        task_head = core.head(self.repo)
+        evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+        evidence["task_exact_heads"] = {"DEC-01-T06": {"head": task_head}}
+        evidence_path.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
+        H.git(self.repo, "add", "docs/sdlc/verify-evidence.json")
+        H.git(self.repo, "commit", "-q", "-m", "record exact task implementation head")
+
+        rc, out = self.run_request(task_base=accepted_head, task_id="DEC-01-T06",
+                                   predecessor_task="DEC-01-T05")
+        self.assertEqual(rc, 0, out)
+        scoped = json.loads(self.approval_files()[0].read_text(encoding="utf-8"))
+        self.assertEqual(scoped["review_scope"]["task_head"], task_head)
+        self.assertEqual(scoped["previous_approval"]["head"], accepted_head)
+
+        next_source = H.commit_file(self.repo, "next-task.py", "changed\n")
+        H.write_evidence(self.repo, tested_head=next_source,
+                         task_exact_heads={"DEC-01-T06": {"head": task_head}},
+                         task_acceptance_records=acceptance_records)
+        H.git(self.repo, "add", "docs/sdlc/verify-evidence.json")
+        H.git(self.repo, "commit", "-q", "-m", "record next task verification evidence")
+        next_head = core.head(self.repo)
+        rc, out = self.run_request()
+        self.assertEqual(rc, 0, out)
+        argv = json.loads((self.tools / "argv.json").read_text(encoding="utf-8"))
+        self.assertEqual(argv[argv.index("--base") + 1], scoped["head"])
+        self.assertEqual(argv[argv.index("--head") + 1], next_head)
 
     def approval_files(self, repo=None, kind="code"):
         repo = repo or self.repo
