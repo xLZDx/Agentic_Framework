@@ -27,6 +27,8 @@ MAX_APPROVAL_CHAIN = 128
 # that the reviewer may be unable to read, so the evidence section is bounded and labelled. The diff
 # itself is never truncated.
 MAX_EVIDENCE_CHARS_PER_FILE = 2_500
+# Evidence metadata (name, sha256, size, status) is always emitted and does not consume the content
+# budget, so an exhausted budget can never hide an evidence source from the reviewer.
 MAX_EVIDENCE_CHARS_TOTAL = 11_000
 EVIDENCE_HEAD_CHARS = 1_000
 
@@ -212,24 +214,31 @@ def build_packet(
     budget = MAX_EVIDENCE_CHARS_TOTAL
     for name in names:
         f = sd / name
-        if not f.is_file() or budget <= 0:
+        if not f.is_file():
             continue
         raw_bytes = f.read_bytes()
         body = raw_bytes.decode("utf-8", errors="replace").replace("\r\n", "\n")
+        original = len(body)
+        header = f"\n## Evidence file: {name}\nsha256: {_sha(raw_bytes)}\noriginal characters: {original}\n"
+        if budget <= 0:
+            parts.append(header + "status: OMITTED - content budget exhausted\n")
+            continue
         limit = min(MAX_EVIDENCE_CHARS_PER_FILE, budget)
-        original_len = len(body)
-        if original_len > limit:
-            head = min(EVIDENCE_HEAD_CHARS, limit)
-            tail = max(limit - head, 0)
-            omitted = original_len - head - tail
-            body = (
-                body[:head]
-                + f"\n\n[... truncated {omitted} of {original_len} characters of {name}; "
-                f"full file at {f}, sha256 {_sha(raw_bytes)} ...]\n\n"
-                + (body[-tail:] if tail else "")
-            )
-        budget -= min(len(body), limit)
-        parts.append(f"\n## Evidence file: {name} (sha256 {_sha(raw_bytes)})\n{body}")
+        if original <= limit:
+            parts.append(header + "status: FULL\n" + body)
+            budget -= original
+            continue
+        head = min(EVIDENCE_HEAD_CHARS, limit)
+        tail = max(limit - head, 0)
+        omitted = original - head - tail
+        parts.append(
+            header
+            + f"status: TRUNCATED - {omitted} of {original} characters omitted; full file at {f}\n"
+            + body[:head]
+            + f"\n\n[... {omitted} characters omitted; full file at {f}, sha256 {_sha(raw_bytes)} ...]\n\n"
+            + (body[-tail:] if tail else "")
+        )
+        budget -= head + tail
     return "\n".join(parts)
 
 

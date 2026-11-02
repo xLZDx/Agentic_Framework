@@ -40,9 +40,35 @@ class Verify(unittest.TestCase):
         packet = pm_review.build_packet(self.repo, "code", head, head, head)
 
         self.assertLess(len(packet), pm_review.MAX_EVIDENCE_CHARS_TOTAL + 20000)
-        self.assertIn("truncated", packet)
+        self.assertIn("status: TRUNCATED", packet)
         self.assertIn("sha256 " + hashlib.sha256(big.encode()).hexdigest(), packet)
         self.assertIn(f"Exact HEAD under review: {head}", packet)
+
+    def test_packet_keeps_evidence_identity_when_budget_is_exhausted(self):
+        for name in ("verify-evidence.json", "verify-evidence.md", "review-record.md",
+                     "test-plan.md", "requirements.md"):
+            path = H.sdlc(self.repo) / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("y" * 20000, encoding="utf-8")
+        backlog = H.sdlc(self.repo) / "backlog.md"
+        backlog.write_text("backlog content", encoding="utf-8")
+        design = H.sdlc(self.repo) / "design.md"
+        design.write_text("design content", encoding="utf-8")
+        head = core.head(self.repo)
+
+        packet = pm_review.build_packet(self.repo, "code", head, head, head)
+
+        for name, path in (("backlog.md", backlog), ("design.md", design)):
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            self.assertIn(f"## Evidence file: {name}", packet)
+            self.assertIn(digest, packet)
+            self.assertIn("status: OMITTED", packet)
+        self.assertIn(f"Exact HEAD under review: {head}", packet)
+
+    def test_packet_does_not_invent_metadata_for_missing_evidence(self):
+        head = core.head(self.repo)
+        packet = pm_review.build_packet(self.repo, "code", head, head, head)
+        self.assertNotIn("## Evidence file: design.md", packet)
 
     def test_artifact_digest_requires_reproducible_provenance(self):
         rel = "change-records/c.md"
