@@ -45,3 +45,12 @@ See the not_run list in verify-evidence.json (real PM Bridge dump mode, real sch
 - Focused re-run after those fixes: `test_curated`, `test_deploy`, `test_deploy_imported` = 41/41 (`sub17.log`); after round 7 remediation five affected files = 77 tests, 76 OK, 1 self-skip (`sub19.log`).
 - Round 7 remediation (unresolved skill references, reporting-analyst state authority, installer warning) is covered by the focused run recorded in `verify-evidence.json`, which stays authoritative.
 - NOT_RUN: complete suite on the final tree (operator rule: no complete re-runs after small fixes).
+
+
+## PM review routing change (change 0015, candidate head e8b3baa)
+- Scope: `tools/af/pm_review.py` and `tests/test_pm_review.py`. A task-scoped review may now root at the committed sprint baseline when that base equals the sprint start HEAD recorded in the committed `docs/sdlc/state.json` and no prior approval exists; incremental reviews keep anchoring at the exact HEAD of the validated prior approval.
+- Diff identity: `git --no-pager diff 9c21daff9d6b3d330dc95b7bab9c69045b627ddd e8b3baaeb853b292c74331d06070b2f93c0b8f19 -- tools/af/pm_review.py tests/test_pm_review.py` = 25,655 bytes, sha256 `d0c25afe48ea12dd25e36d96241538729589b04c15e600790250771bec1564b3`, reproduced in this session.
+- Exact-HEAD functional evidence: `python -m unittest discover -s tests -p test_pm_review.py -v` in the clean candidate worktree at `e8b3baaeb853b292c74331d06070b2f93c0b8f19`: Ran 54 tests in 939.462 s, `OK` (54 passed, 0 failed, 0 errors, 0 skipped). Log `C:\Users\koros\AppData\Local\Temp\af-pm-review-e8b3baa-unittest.log`, sha256 `4AD6AEA751FEBFD46FC0759CB5CD3D4233EA67D75311054E6DF0479E97F6F944`; only non-fatal `ResourceWarning` from `tools/af/core.py:98`. This was the single authorized exact-HEAD rerun; the earlier interrupted attempt produced no result and stays `NOT_VERIFIED`; the earlier role run at parent `9c21daf` plus the identical diff (54/54) is historical, not exact-HEAD evidence.
+- Read-only `python-reviewer` and `security-reviewer` passes on the same diff found no actionable finding.
+- Prior approval `PMG-20261102-9c21daff` is bound to head `9c21daff9d6b3d330dc95b7bab9c69045b627ddd` only; it does not approve `e8b3baa`. The official PM review at the candidate head is requested separately through `af_cli.py pm-review`.
+- NOT_RUN: complete framework suite on this tree, GitHub CI, push (pending the official PM review bound to this HEAD).
