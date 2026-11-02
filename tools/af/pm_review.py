@@ -37,8 +37,36 @@ def _sha(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def _trusted_sprint_start(project: Path, revision: str) -> str | None:
+    """Resolve a sprint baseline only when it matches the committed project state."""
+    try:
+        working_state = core.read_state(project)
+        state_path = (core.state_dir(project) / "state.json").relative_to(project).as_posix()
+        committed = subprocess.run(
+            ["git", "-C", str(project), "show", f"{revision}:{state_path}"],
+            capture_output=True, check=False,
+        )
+        if committed.returncode != 0 or not isinstance(working_state, dict):
+            return None
+        committed_state = json.loads(committed.stdout)
+        if not isinstance(committed_state, dict):
+            return None
+        start_head = committed_state.get("start_head")
+        if (
+            not isinstance(working_state, dict)
+            or working_state.get("sprint_id") != committed_state.get("sprint_id")
+            or working_state.get("start_head") != start_head
+        ):
+            return None
+        if not isinstance(start_head, str) or not start_head:
+            return None
+        return core.git(project, "rev-parse", "--verify", f"{start_head}^{{commit}}").strip()
+    except (OSError, RuntimeError, ValueError):
+        return None
+
+
 def _valid_task_scope(project: Path, scope: dict, candidate_head: str, sprint_base_sha: str) -> bool:
-    """Require a PM-approved base and a range containing only the recorded task plus SDLC evidence."""
+    """Require an exact task base and a range containing only that task plus SDLC evidence."""
     if (
         scope.get("type") != "task"
         or not isinstance(scope.get("id"), str) or not scope["id"].strip()
@@ -114,13 +142,19 @@ def build_packet(
             f"Task: {task_scope['id']}\n"
             f"Task diff base: {task_scope['base_sha']}\n"
             f"Previous task label: {task_scope['predecessor_task']}\n"
-            f"Review base: {task_scope['base_sha']} (must have a valid official PM approval)\n"
+            f"Review base: {task_scope['base_sha']} (scope boundary supplied for this task review)\n"
             f"Current task implementation HEAD: {task_scope['task_head']}\n"
             "Review only the concrete task delta from this base through the exact HEAD above. "
             "This request does not claim review or approval of changes outside that range. "
             "The task labels and task-head evidence are scope metadata, not acceptance proof. "
-            "The review base is trusted only through the validated official PM approval at that exact HEAD. "
-            "Do not expand the code-review scope to the cumulative sprint diff."
+            "This request does not claim that the review base was previously reviewed or accepted. "
+            "Treat task_acceptance_records in project evidence as unverified context. "
+            + (
+                "The task base is the exact configured sprint baseline and roots this approval chain. "
+                if task_scope.get("base_anchor") == "sprint-base" else
+                "The task base is the exact HEAD of the validated prior PM approval. "
+            )
+            + "Do not expand the code-review scope to the cumulative sprint diff."
         )
     names = ["verify-evidence.json", "verify-evidence.md", "review-record.md", "test-plan.md",
              "requirements.md", "backlog.md", "design.md"]
@@ -316,8 +350,15 @@ def _valid_approval_record(
         not isinstance(task_scope, dict)
         or task_scope.get("base_sha") != base_sha
         or not _valid_task_scope(project, task_scope, head, sprint_base_sha)
-        or expected_previous is None
-        or expected_previous.get("head") != base_sha
+        or _trusted_sprint_start(project, head) != sprint_base_sha
+        or (
+            expected_previous is None
+            and (task_scope.get("base_anchor") != "sprint-base" or base_sha != sprint_base_sha)
+        )
+        or (
+            expected_previous is not None
+            and (task_scope.get("base_anchor") != "approval" or expected_previous.get("head") != base_sha)
+        )
     ):
         return False, None
     if (
@@ -558,6 +599,18 @@ def request(project: Path, kind: str, base: str, node: str = "node", project_id:
         print(f"REFUSED: {problem}")
         return 2
     sprint_base_sha = core.git(project, "rev-parse", "--verify", f"{base}^{{commit}}").strip()
+    artifact_snapshot = core.artifact_digests(project) if kind == "code" else {}
+    state_path = sd / "state.json"
+    if kind == "code" and state_path.is_file():
+        artifact_snapshot["state.json"] = _sha(state_path.read_bytes())
+    uncommitted_artifacts = [
+        name for name, expected in artifact_snapshot.items()
+        if expected not in _git_blob_shas(project, head_sha, name)
+    ]
+    if uncommitted_artifacts:
+        print("REFUSED: acceptance artifacts are not present in the committed HEAD: "
+              + ", ".join(uncommitted_artifacts[:10]))
+        return 2
     previous = _previous_approval(project, review_cwd, sprint_base_sha, head_sha) if kind == "code" else None
     task_scope = None
     if task_base:
@@ -574,6 +627,9 @@ def request(project: Path, kind: str, base: str, node: str = "node", project_id:
         if not in_sprint or not before_head:
             print("REFUSED: task review base must be in the sprint ancestry and before HEAD.")
             return 2
+        if _trusted_sprint_start(project, head_sha) != sprint_base_sha:
+            print("REFUSED: task-scoped review requires --base to match the recorded sprint start HEAD.")
+            return 2
         try:
             evidence_data = json.loads((sd / evidence.FILE).read_text(encoding="utf-8"))
             task_record = evidence_data.get("task_exact_heads", {}).get(task_id.strip())
@@ -584,7 +640,7 @@ def request(project: Path, kind: str, base: str, node: str = "node", project_id:
         task_after_base = subprocess.run(["git", "-C", str(project), "merge-base", "--is-ancestor", task_base_sha, task_head]).returncode == 0
         task_before_head = subprocess.run(["git", "-C", str(project), "merge-base", "--is-ancestor", task_head, head_sha]).returncode == 0
         if not task_after_base or not task_before_head:
-            print("REFUSED: recorded implementation HEAD is outside the PM-approved-base-to-candidate range.")
+            print("REFUSED: recorded implementation HEAD is outside the task-base-to-candidate range.")
             return 2
         task_paths = set(core.git(project, "diff", "--name-only", f"{task_base_sha}...{task_head}").splitlines())
         candidate_paths = set(core.git(project, "diff", "--name-only", f"{task_base_sha}...{head_sha}").splitlines())
@@ -593,13 +649,20 @@ def request(project: Path, kind: str, base: str, node: str = "node", project_id:
         ):
             print("REFUSED: scoped range has changes outside the recorded task delta and its SDLC evidence.")
             return 2
-        if previous is None or previous["head"] != task_base_sha:
-            print("REFUSED: task-scoped review requires a valid correlated PM approval at the exact --task-base HEAD.")
-            return 2
+        if previous is not None and previous["head"] != task_base_sha:
+            previous = None
+        if previous is None:
+            if task_base_sha != sprint_base_sha:
+                print("REFUSED: without a valid approval at --task-base, scoped review must start at the configured sprint baseline.")
+                return 2
+            base_anchor = "sprint-base"
+        else:
+            base_anchor = "approval"
         review_base = task_base_sha
         task_scope = {
             "type": "task", "id": task_id.strip(), "base_sha": task_base_sha,
             "task_head": task_head, "predecessor_task": predecessor_task.strip(),
+            "base_anchor": base_anchor,
         }
     else:
         if task_id or predecessor_task:
@@ -684,7 +747,7 @@ def request(project: Path, kind: str, base: str, node: str = "node", project_id:
         "diff_in_prompt_sha256": _sha(diff_in_prompt.encode("utf-8")),
         "evidence_sha256": _sha(ev_json.read_bytes()) if ev_json.is_file() else None,
         "sprint_id": (core.read_state(project) or {}).get("sprint_id"),
-        "artifacts": core.artifact_digests(project) if kind == "code" else {},
+        "artifacts": artifact_snapshot,
         "reply_sha256": _sha((result.get("reply") or "").encode("utf-8")),
         "recorded": core.now_iso(),
         "reviewer": "GPT-PM via PM Bridge review.js",
@@ -737,12 +800,12 @@ def verify(project: Path, kind: str = "code") -> tuple[bool, str]:
             or _sha(diff) != a.get("diff_sha256")
             or not _valid_approval_markdown(markdown, a)
         ):
-            return False, "task approval scope does not match its PM-approved base and exact Git range"
+            return False, "task approval scope does not match its exact task base and Git range"
         chain = _previous_approval_from(
             project, project, [project], sprint_base_sha, cur, allow_current_head=True,
         )
         if chain is None or chain.get("head") != cur:
-            return False, "task approval lacks a validated PM approval chain rooted at its exact predecessor HEAD"
+            return False, "task approval is not the validated exact-head root or tip of its approval chain"
     if not (a.get("request_id") and a.get("reply_id")):
         return False, "approval lacks correlated ids"
     if not mpath.is_file() or a["head"] not in mpath.read_text(encoding="utf-8"):
@@ -750,6 +813,9 @@ def verify(project: Path, kind: str = "code") -> tuple[bool, str]:
     recorded = a.get("artifacts") or {}
     if recorded:
         now = core.artifact_digests(project)
+        state_path = core.state_dir(project) / "state.json"
+        if state_path.is_file():
+            now["state.json"] = _sha(state_path.read_bytes())
         changed = sorted(k for k in set(recorded) | set(now) if recorded.get(k) != now.get(k))
         if changed:
             return False, f"artifacts changed after the approval: {', '.join(changed[:5])}"
