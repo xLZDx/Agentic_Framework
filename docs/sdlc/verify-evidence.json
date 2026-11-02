@@ -1,14 +1,14 @@
 {
-  "tested_head": "5568d16ce2daf0839c66ef38545346d270c878e2",
+  "tested_head": "f8ebbf19436c110b838e054ea97ef22bc2d6bc67",
   "runs": [
     {
-      "command": "python -m unittest discover -s tests -p test_pm_review.py -v (cwd D:\\Repo\\Agentic_Framework\\.worktrees\\pm-review-routing, HEAD 5568d16ce2daf0839c66ef38545346d270c878e2)",
-      "total": 57,
-      "passed": 57,
+      "command": "python -m unittest discover -s tests -p test_pm_review.py -v (cwd D:\\Repo\\Agentic_Framework\\.worktrees\\pm-review-routing, HEAD f8ebbf19436c110b838e054ea97ef22bc2d6bc67)",
+      "total": 58,
+      "passed": 58,
       "failed": 0,
       "errors": 0,
       "skipped": 0,
-      "log": "C:\\Users\\koros\\AppData\\Local\\Temp\\af-pm-review-5568d16-unittest.log (Ran 57 tests in 1132.227 s, result OK, sha256 68dd2e95a565e1c8a0ed42937065a1cdf24f7c219e8114752d0c6f1c47674935); non-fatal ResourceWarning from tools/af/core.py:98"
+      "log": "C:\\Users\\koros\\AppData\\Local\\Temp\\af-pm-review-f8ebbf1-unittest.log (Ran 58 tests in 943.054 s, result OK, sha256 9a924afea568659e9de9b189b3a2f881dc9c41b13c471a4568c5037ce442c3ed); non-fatal ResourceWarning from tools/af/core.py:98"
     }
   ],
   "not_run": [
@@ -78,7 +78,7 @@
     }
   ],
   "pm_review_routing_change": {
-    "candidate_head": "5568d16ce2daf0839c66ef38545346d270c878e2",
+    "candidate_head": "f8ebbf19436c110b838e054ea97ef22bc2d6bc67",
     "candidate_parent": "9c21daff9d6b3d330dc95b7bab9c69045b627ddd",
     "sprint_base": "164d300e487c2165b7b355e0e9322b0e31acdfd3",
     "source_test_diff_paths": [
@@ -89,10 +89,11 @@
     "source_test_diff_bytes": 25655,
     "purpose": "let an official task-scoped PM review root at the committed sprint baseline when no prior approval exists, binding the baseline to the committed state.json sprint/start_head",
     "previous_approval": "PMG-20261102-9c21daff covers head 9c21daf only; it does not cover e8b3baa",
-    "exact_head_test_status": "PASS 57/57 at 5568d16ce2daf0839c66ef38545346d270c878e2; earlier runs at 6c139ce, ca0825c and e8b3baa are historical",
+    "exact_head_test_status": "PASS 58/58 at f8ebbf19436c110b838e054ea97ef22bc2d6bc67",
     "official_pm_review_at_candidate": "Requested after this evidence commit; no approval recorded yet",
     "round2_finding": "PM review 82014858-e5aa-47bc-8004-853225d65b86 returned MAJOR: the baseline came from mutable current-HEAD state.json, so a committed redefinition could shrink a first-task review range",
     "round2_fix": "baseline must equal the start_head of the earliest commit that introduced the sprint id, that baseline must precede the creation commit, and the creation commit must precede the reviewed HEAD",
-    "artifact_digest_tolerance": "a recorded digest is accepted only when Git can reproduce it for the approved revision, or when it hashes the artifact on disk and that artifact equals the committed blob under CRLF/LF normalisation; approvals also record artifacts_canonical. The digest is never ignored (PM MAJOR-01 on request 993fd4c2-3bea-4214-88c4-1e4cc9864556)."
+    "artifact_digest_tolerance": "a recorded digest is accepted only when Git can reproduce it for the approved revision, or when it hashes the artifact on disk and that artifact equals the committed blob under CRLF/LF normalisation; approvals also record artifacts_canonical. The digest is never ignored (PM MAJOR-01 on request 993fd4c2-3bea-4214-88c4-1e4cc9864556).",
+    "packet_bound": "evidence sections are capped at 2,500 chars per file (1,000 head) and 11,000 chars total so the review stays inline; the diff and the task/base/head metadata are never truncated and every evidence file keeps its sha256"
   }
 }
