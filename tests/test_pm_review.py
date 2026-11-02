@@ -29,7 +29,7 @@ class Verify(unittest.TestCase):
         self.assertTrue(ok)
         self.assertIn(h, why)
 
-    def test_artifact_digest_tolerates_line_endings_only_when_blob_matches(self):
+    def test_artifact_digest_requires_reproducible_provenance(self):
         rel = "change-records/c.md"
         path = H.sdlc(self.repo) / rel
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -37,12 +37,31 @@ class Verify(unittest.TestCase):
         H.git(self.repo, "add", "docs/sdlc/" + rel)
         H.git(self.repo, "commit", "-q", "-m", "add change record")
         head = core.head(self.repo)
-        mixed = b"one\r\ntwo\n"  # legacy working copy whose record was hashed before normalisation
-        expected = hashlib.sha256(mixed).hexdigest()
+        blob_digest = hashlib.sha256(b"one\ntwo\n").hexdigest()
+        crlf_digest = hashlib.sha256(b"one\r\ntwo\r\n").hexdigest()
+        mixed = b"one\r\ntwo\n"
+        mixed_digest = hashlib.sha256(mixed).hexdigest()
+        arbitrary = hashlib.sha256(b"nonsense").hexdigest()
 
-        self.assertTrue(pm_review._artifact_matches(self.repo, head, rel, expected))
+        # digests Git itself can reproduce for this revision
+        self.assertTrue(pm_review._artifact_matches(self.repo, head, rel, blob_digest, None))
+        self.assertTrue(pm_review._artifact_matches(self.repo, head, rel, crlf_digest, None))
+
+        # legacy mixed-EOL checkout: the recorded digest hashes the artifact that is on disk
+        path.write_bytes(mixed)
+        self.assertTrue(pm_review._artifact_matches(self.repo, head, rel, mixed_digest, None))
+        self.assertTrue(pm_review._artifact_matches(self.repo, head, rel, mixed_digest, blob_digest))
+        # ... but the recorded digest is never ignored
+        self.assertFalse(pm_review._artifact_matches(self.repo, head, rel, arbitrary, None))
+        self.assertFalse(pm_review._artifact_matches(self.repo, head, rel, arbitrary, blob_digest))
+        self.assertFalse(pm_review._artifact_matches(
+            self.repo, head, rel, mixed_digest, hashlib.sha256(b"other").hexdigest()))
+
+        # changed or missing artifact contents are refused
         path.write_bytes(b"one\ntwo changed\n")
-        self.assertFalse(pm_review._artifact_matches(self.repo, head, rel, expected))
+        self.assertFalse(pm_review._artifact_matches(self.repo, head, rel, mixed_digest, None))
+        path.unlink()
+        self.assertFalse(pm_review._artifact_matches(self.repo, head, rel, mixed_digest, None))
 
     def test_new_commit_invalidates(self):
         H.write_approval(self.repo)
@@ -222,6 +241,7 @@ class Request(unittest.TestCase):
         approval = json.loads(self.approval_files()[0].read_text(encoding="utf-8"))
         self.assertEqual(approval["head"], candidate_head)
         self.assertEqual(approval["review_scope"]["id"], "DEC-01-T06")
+        self.assertIn("artifacts_canonical", approval)
         self.assertEqual(approval["review_scope"]["base_sha"], accepted_head)
         self.assertEqual(approval["review_scope"]["task_head"], task_head)
         ok, why = pm_review.verify(self.repo)

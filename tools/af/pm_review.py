@@ -274,21 +274,53 @@ def _git_blob_shas(project: Path, revision: str, name: str) -> set[str]:
     return {_sha(data) for data in variants}
 
 
-def _artifact_matches(project: Path, revision: str, name: str, expected: str) -> bool:
-    """Bind a recorded artifact digest to the committed artifact at the approved revision.
+def _canonical_sha(data: bytes) -> str:
+    """Digest of an artifact independent of its line-ending serialisation."""
+    return _sha(data.replace(b"\r\n", b"\n"))
 
-    The digest was taken from the working copy, whose line endings can differ from the committed blob
-    (a mixed-EOL Windows checkout is the known case). Falling back on the blob is not a weakening: an
-    approval is only requested on a clean tracked tree, so the artifact at approval time was exactly
-    the committed blob of that revision. The fallback therefore still proves "the artifact is the one
-    that head approved"; it only tolerates the line-ending form of the record.
+
+def _canonical_artifact_digests(project: Path) -> dict:
+    """Canonical (line-ending independent) digest for every phase-1..7 artifact."""
+    names = list(core.artifact_digests(project))
+    state_path = core.state_dir(project) / "state.json"
+    if state_path.is_file():
+        names.append("state.json")
+    out = {}
+    for name in names:
+        path = core.state_dir(project) / name
+        try:
+            out[name] = _canonical_sha(path.read_bytes())
+        except OSError:
+            continue
+    return out
+
+
+def _artifact_matches(
+    project: Path, revision: str, name: str, expected: str, canonical: str | None = None,
+) -> bool:
+    """Validate one recorded artifact digest against the approved revision.
+
+    The recorded digest is always used: either it is a serialisation Git itself knows for that
+    revision, or it must hash the artifact that is on disk right now. Only then is the artifact
+    compared with the committed blob under CRLF/LF normalisation, which tolerates the line-ending
+    form of a Windows checkout without disconnecting the digest from the artifact. An approval whose
+    digest matches neither the revision nor the artifact is refused, which sends the caller back to
+    the full sprint baseline instead of trusting the working copy.
     """
-    variants = _git_blob_shas(project, revision, name)
-    if expected in variants:
+    if expected in _git_blob_shas(project, revision, name):
         return True
+    path = core.state_dir(project) / name
     try:
-        state = core.state_dir(project)
-        repo_path = (state.relative_to(project) / name).as_posix()
+        current = path.read_bytes()
+    except OSError:
+        return False
+    current_canonical = _canonical_sha(current)
+    if _sha(current) != expected and current_canonical != expected:
+        return False
+    if isinstance(canonical, str) and canonical and canonical != current_canonical:
+        return False
+    try:
+        repo_path = path.relative_to(project).as_posix()
     except ValueError:
         return False
     blob = subprocess.run(
@@ -298,11 +330,7 @@ def _artifact_matches(project: Path, revision: str, name: str, expected: str) ->
     )
     if blob.returncode != 0 or not blob.stdout:
         return False
-    current = (core.state_dir(project) / name).read_bytes() if (core.state_dir(project) / name).is_file() else None
-    if current is None:
-        return False
-    normalize = lambda data: data.replace(b"\r\n", b"\n")  # noqa: E731
-    return _sha(normalize(current)) == _sha(normalize(blob.stdout))
+    return _canonical_sha(blob.stdout) == current_canonical
 
 
 def _approval_summary(approval: dict) -> dict:
@@ -504,8 +532,13 @@ def _valid_approval_record(
         for name, expected in artifacts.items()
     ):
         return False, None
+    canonical_artifacts = approval.get("artifacts_canonical")
+    if canonical_artifacts is not None and not isinstance(canonical_artifacts, dict):
+        return False, None
+    canonical_artifacts = canonical_artifacts or {}
     if any(
-        not _artifact_matches(project, head, name, expected) for name, expected in artifacts.items()
+        not _artifact_matches(project, head, name, expected, canonical_artifacts.get(name))
+        for name, expected in artifacts.items()
     ):
         return False, None
     evidence_sha = approval.get("evidence_sha256")
@@ -683,7 +716,7 @@ def request(project: Path, kind: str, base: str, node: str = "node", project_id:
         artifact_snapshot["state.json"] = _sha(state_path.read_bytes())
     uncommitted_artifacts = [
         name for name, expected in artifact_snapshot.items()
-        if expected not in _git_blob_shas(project, head_sha, name)
+        if not _artifact_matches(project, head_sha, name, expected)
     ]
     if uncommitted_artifacts:
         print("REFUSED: acceptance artifacts are not present in the committed HEAD: "
@@ -826,6 +859,7 @@ def request(project: Path, kind: str, base: str, node: str = "node", project_id:
         "evidence_sha256": _sha(ev_json.read_bytes()) if ev_json.is_file() else None,
         "sprint_id": (core.read_state(project) or {}).get("sprint_id"),
         "artifacts": artifact_snapshot,
+        "artifacts_canonical": _canonical_artifact_digests(project),
         "reply_sha256": _sha((result.get("reply") or "").encode("utf-8")),
         "recorded": core.now_iso(),
         "reviewer": "GPT-PM via PM Bridge review.js",
