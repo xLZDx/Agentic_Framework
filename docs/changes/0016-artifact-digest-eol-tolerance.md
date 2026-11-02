@@ -13,5 +13,5 @@ The fallback does not weaken the binding: `pm-review` only runs on a clean track
 
 ## Verification
 - Focused: `python -m unittest discover -s tests -p test_pm_review.py -k artifact_digest_tolerates` = 1 passed, 0 failed.
-- Full affected-file rerun at the exact commit is recorded in `docs/sdlc/verify-evidence.json` and `verify-evidence.md`.
+- Full affected-file rerun at `ca0825c4a1f1ce6ba14ffa70b2edf232c6379047`: 57 tests, 57 passed, 0 failed, 0 errors, 0 skipped, `Ran 57 tests in 1022.986s`, `OK` (log `af-pm-review-ca0825c-unittest.log`, sha256 `F8FEA3C79DBE26906831733CB7FC042D793D779C84B8E6CE697A677282D18CE4`).
 - NOT_RUN: complete framework suite, GitHub CI.

@@ -1,23 +1,14 @@
 {
-  "tested_head": "6c139cea179d6290cf27ca6546ccde33a65c32b6",
+  "tested_head": "ca0825c4a1f1ce6ba14ffa70b2edf232c6379047",
   "runs": [
     {
-      "command": "python -m unittest discover -s tests -p test_pm_review.py -v (cwd D:\\Repo\\Agentic_Framework\\.worktrees\\pm-review-routing, HEAD 6c139cea179d6290cf27ca6546ccde33a65c32b6)",
-      "total": 56,
-      "passed": 56,
+      "command": "python -m unittest discover -s tests -p test_pm_review.py -v (cwd D:\\Repo\\Agentic_Framework\\.worktrees\\pm-review-routing, HEAD ca0825c4a1f1ce6ba14ffa70b2edf232c6379047)",
+      "total": 57,
+      "passed": 57,
       "failed": 0,
       "errors": 0,
       "skipped": 0,
-      "log": "C:\\Users\\koros\\AppData\\Local\\Temp\\af-pm-review-6c139ce-unittest.log (Ran 56 tests in 836.660 s, result OK, sha256 A95ED03D4A7CF0BFD746715D3E219DAD7B393E895B4DADDFD321C726A242DBED); non-fatal ResourceWarning from tools/af/core.py:98"
-    },
-    {
-      "command": "python -m unittest discover -s tests -p test_pm_review.py -v (clean candidate worktree, HEAD e8b3baaeb853b292c74331d06070b2f93c0b8f19) - historical",
-      "total": 54,
-      "passed": 54,
-      "failed": 0,
-      "errors": 0,
-      "skipped": 0,
-      "log": "af-pm-review-e8b3baa-unittest.log, Ran 54 tests in 939.462 s, OK"
+      "log": "C:\\Users\\koros\\AppData\\Local\\Temp\\af-pm-review-ca0825c-unittest.log (Ran 57 tests in 1022.986 s, result OK, sha256 F8FEA3C79DBE26906831733CB7FC042D793D779C84B8E6CE697A677282D18CE4); non-fatal ResourceWarning from tools/af/core.py:98"
     }
   ],
   "not_run": [
@@ -87,7 +78,7 @@
     }
   ],
   "pm_review_routing_change": {
-    "candidate_head": "6c139cea179d6290cf27ca6546ccde33a65c32b6",
+    "candidate_head": "ca0825c4a1f1ce6ba14ffa70b2edf232c6379047",
     "candidate_parent": "9c21daff9d6b3d330dc95b7bab9c69045b627ddd",
     "sprint_base": "164d300e487c2165b7b355e0e9322b0e31acdfd3",
     "source_test_diff_paths": [
@@ -98,9 +89,10 @@
     "source_test_diff_bytes": 25655,
     "purpose": "let an official task-scoped PM review root at the committed sprint baseline when no prior approval exists, binding the baseline to the committed state.json sprint/start_head",
     "previous_approval": "PMG-20261102-9c21daff covers head 9c21daf only; it does not cover e8b3baa",
-    "exact_head_test_status": "PASS 56/56 at 6c139ce; earlier 54/54 at e8b3baa is historical",
+    "exact_head_test_status": "PASS 57/57 at ca0825c; earlier 56/56 at 6c139ce and 54/54 at e8b3baa are historical",
     "official_pm_review_at_candidate": "Requested after this evidence commit; no approval recorded yet",
     "round2_finding": "PM review 82014858-e5aa-47bc-8004-853225d65b86 returned MAJOR: the baseline came from mutable current-HEAD state.json, so a committed redefinition could shrink a first-task review range",
-    "round2_fix": "baseline must equal the start_head of the earliest commit that introduced the sprint id, that baseline must precede the creation commit, and the creation commit must precede the reviewed HEAD"
+    "round2_fix": "baseline must equal the start_head of the earliest commit that introduced the sprint id, that baseline must precede the creation commit, and the creation commit must precede the reviewed HEAD",
+    "artifact_digest_tolerance": "recorded artifact digests are additionally accepted when the current artifact equals the committed blob at the approved revision after CRLF/LF normalisation; approvals are only requested on a clean tree, so the binding to the approved head is unchanged"
   }
 }
