@@ -133,23 +133,48 @@ class Request(unittest.TestCase):
                                        predecessor_task=predecessor_task)
         return rc, buf.getvalue()
 
-    def add_task_scope_evidence(self, task_head, accepted_head, task_id="DEC-01-T06", predecessor_task="DEC-01-T05"):
+    def commit_accepted_task_base(self):
+        H.git(self.repo, "add", "docs/sdlc")
+        H.git(self.repo, "commit", "-q", "-m", "commit baseline SDLC evidence")
+        predecessor_source = H.commit_file(self.repo, "accepted-predecessor.py", "accepted\n")
+        H.write_evidence(self.repo, tested_head=predecessor_source)
+        H.git(self.repo, "add", "accepted-predecessor.py", "docs/sdlc/verify-evidence.json")
+        H.git(self.repo, "commit", "-q", "-m", "commit predecessor evidence baseline")
+        return core.head(self.repo)
+
+    def approve_task_base(self, accepted_head):
+        self.assertEqual(core.head(self.repo), accepted_head)
+        rc, out = self.run_request()
+        self.assertEqual(rc, 0, out)
+        approval = json.loads(self.approval_files()[0].read_text(encoding="utf-8"))
+        self.assertEqual(approval["head"], accepted_head)
+        return approval
+
+    def add_predecessor_acceptance(self, accepted_head, record_head=None):
         path = H.sdlc(self.repo) / "verify-evidence.json"
         data = json.loads(path.read_text(encoding="utf-8"))
-        data["task_exact_heads"] = {task_id: {"head": task_head}}
         data["task_acceptance_records"] = {
-            predecessor_task: {
-                "status": "ACCEPTED", "accepted_head": accepted_head,
+            "DEC-01-T05": {
+                "status": "ACCEPTED", "accepted_head": record_head or accepted_head,
                 "request_id": "accepted-request", "reply_id": "accepted-reply",
                 "bridge_job_id": "accepted-job", "correlated": True,
             }
         }
         path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
         H.git(self.repo, "add", "docs/sdlc/verify-evidence.json")
+        H.git(self.repo, "commit", "-q", "-m", "record accepted predecessor decision")
+
+    def add_task_scope_evidence(self, task_head, accepted_head, task_id="DEC-01-T06", predecessor_task="DEC-01-T05"):
+        path = H.sdlc(self.repo) / "verify-evidence.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data["task_exact_heads"] = {task_id: {"head": task_head}}
+        path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+        H.git(self.repo, "add", "docs/sdlc/verify-evidence.json")
         H.git(self.repo, "commit", "-q", "-m", "record accepted task scope evidence")
 
     def test_explicit_task_scope_reviews_only_accepted_task_delta_and_binds_head(self):
-        accepted_head = H.commit_file(self.repo, "accepted-predecessor.py", "accepted\n")
+        accepted_head = self.commit_accepted_task_base()
+        self.approve_task_base(accepted_head)
         task_head = self.commit_code_and_evidence()
         self.add_task_scope_evidence(task_head, accepted_head)
         candidate_head = core.head(self.repo)
@@ -163,7 +188,8 @@ class Request(unittest.TestCase):
         packet = (self.tools / "packet.md").read_text(encoding="utf-8")
         self.assertIn("Explicit task-scoped review", packet)
         self.assertIn("Task: DEC-01-T06", packet)
-        self.assertIn(f"Accepted predecessor: DEC-01-T05 at {accepted_head}", packet)
+        self.assertIn("Previous task label: DEC-01-T05", packet)
+        self.assertIn("task labels and task-head evidence are scope metadata, not acceptance proof", packet)
         self.assertIn(f"Exact HEAD under review: {candidate_head}", packet)
 
         approval = json.loads(self.approval_files()[0].read_text(encoding="utf-8"))
@@ -173,16 +199,57 @@ class Request(unittest.TestCase):
         self.assertEqual(approval["review_scope"]["task_head"], task_head)
         self.assertTrue(pm_review.verify(self.repo)[0])
 
-    def test_scoped_review_requires_correlated_accepted_predecessor_at_exact_base(self):
-        self.commit_code_and_evidence()
-        rc, out = self.run_request(task_base=self.base, task_id="DEC-01-T06",
+    def test_scoped_review_requires_official_pm_approval_at_exact_base(self):
+        accepted_head = self.commit_accepted_task_base()
+        task_head = self.commit_code_and_evidence()
+        self.add_task_scope_evidence(task_head, accepted_head)
+        rc, out = self.run_request(task_base=accepted_head, task_id="DEC-01-T06",
                                    predecessor_task="DEC-01-T05")
         self.assertEqual(rc, 2)
-        self.assertIn("lacks a correlated accepted predecessor record", out)
+        self.assertIn("requires a valid correlated PM approval at the exact --task-base HEAD", out)
         self.assertFalse(self.approval_files()[0].exists())
 
+    def test_task_acceptance_metadata_does_not_substitute_for_official_pm_approval(self):
+        accepted_head = self.commit_accepted_task_base()
+        self.add_predecessor_acceptance(accepted_head)
+        task_head = self.commit_code_and_evidence()
+        self.add_task_scope_evidence(task_head, accepted_head)
+
+        rc, out = self.run_request(task_base=accepted_head, task_id="DEC-01-T06",
+                                   predecessor_task="DEC-01-T05")
+        self.assertEqual(rc, 2)
+        self.assertIn("requires a valid correlated PM approval at the exact --task-base HEAD", out)
+        self.assertFalse(self.approval_files()[0].exists())
+
+    def test_scoped_review_ignores_untrusted_task_acceptance_metadata(self):
+        accepted_head = self.commit_accepted_task_base()
+        self.approve_task_base(accepted_head)
+        self.add_predecessor_acceptance(accepted_head, record_head=self.base)
+        task_head = self.commit_code_and_evidence()
+        self.add_task_scope_evidence(task_head, accepted_head)
+
+        rc, out = self.run_request(task_base=accepted_head, task_id="DEC-01-T06",
+                                   predecessor_task="DEC-01-T05")
+        self.assertEqual(rc, 0, out)
+
+    def test_scoped_review_refuses_corrupted_prior_approval_result_receipt(self):
+        accepted_head = self.commit_accepted_task_base()
+        self.approve_task_base(accepted_head)
+        task_head = self.commit_code_and_evidence()
+        self.add_task_scope_evidence(task_head, accepted_head)
+        receipt = H.sdlc(self.repo) / ".pm-review" / f"result-code-{accepted_head[:12]}.json"
+        receipt.write_text("{corrupted receipt\n", encoding="utf-8")
+
+        rc, out = self.run_request(task_base=accepted_head, task_id="DEC-01-T06",
+                                   predecessor_task="DEC-01-T05")
+        self.assertEqual(rc, 2)
+        self.assertIn("requires a valid correlated PM approval at the exact --task-base HEAD", out)
+
     def test_task_scope_refuses_later_edits_to_task_files(self):
-        accepted_head = H.commit_file(self.repo, "accepted-predecessor.py", "accepted\n")
+        accepted_head = self.commit_accepted_task_base()
+        previous_approval = self.approve_task_base(accepted_head)
+        approval_path = self.approval_files()[0]
+        self.add_predecessor_acceptance(accepted_head)
         task_head = self.commit_code_and_evidence("task.py")
         self.add_task_scope_evidence(task_head, accepted_head)
         latest_source_head = H.commit_file(self.repo, "task.py", "changed after recorded task head\n")
@@ -193,39 +260,18 @@ class Request(unittest.TestCase):
                                    predecessor_task="DEC-01-T05")
         self.assertEqual(rc, 2)
         self.assertIn("task-scope evidence or exact path range", out)
-        self.assertFalse(self.approval_files()[0].exists())
+        refused_approval = json.loads(approval_path.read_text(encoding="utf-8"))
+        self.assertEqual(refused_approval["approval_id"], previous_approval["approval_id"])
+        self.assertEqual(refused_approval["head"], accepted_head)
 
     def test_task_scoped_approval_can_anchor_next_incremental_review(self):
-        H.git(self.repo, "add", "docs/sdlc")
-        H.git(self.repo, "commit", "-q", "-m", "commit baseline SDLC evidence")
-        predecessor_source = H.commit_file(self.repo, "accepted-predecessor.py", "accepted\n")
-        H.write_evidence(self.repo, tested_head=predecessor_source)
-        H.git(self.repo, "add", "accepted-predecessor.py", "docs/sdlc/verify-evidence.json")
-        H.git(self.repo, "commit", "-q", "-m", "commit predecessor evidence baseline")
-        accepted_head = core.head(self.repo)
-
-        rc, out = self.run_request()
-        self.assertEqual(rc, 0, out)
-        previous = json.loads(self.approval_files()[0].read_text(encoding="utf-8"))
-        self.assertEqual(previous["head"], accepted_head)
-
-        acceptance_records = {
-            "DEC-01-T05": {
-                "status": "ACCEPTED", "accepted_head": accepted_head,
-                "request_id": "accepted-request", "reply_id": "accepted-reply",
-                "bridge_job_id": "accepted-job", "correlated": True,
-            }
-        }
+        accepted_head = self.commit_accepted_task_base()
+        previous = self.approve_task_base(accepted_head)
         evidence_path = H.sdlc(self.repo) / "verify-evidence.json"
-        evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
-        evidence["task_acceptance_records"] = acceptance_records
-        evidence_path.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
-        H.git(self.repo, "add", "docs/sdlc/verify-evidence.json")
-        H.git(self.repo, "commit", "-q", "-m", "record accepted predecessor decision")
 
         task_source = H.commit_file(self.repo, "task.py", "changed\n")
         H.write_evidence(self.repo, tested_head=task_source,
-                         task_acceptance_records=acceptance_records)
+                         task_exact_heads={"DEC-01-T06": {"head": task_source}})
         H.git(self.repo, "add", "docs/sdlc/verify-evidence.json")
         H.git(self.repo, "commit", "-q", "-m", "record task implementation evidence")
         task_head = core.head(self.repo)
@@ -244,8 +290,7 @@ class Request(unittest.TestCase):
 
         next_source = H.commit_file(self.repo, "next-task.py", "changed\n")
         H.write_evidence(self.repo, tested_head=next_source,
-                         task_exact_heads={"DEC-01-T06": {"head": task_head}},
-                         task_acceptance_records=acceptance_records)
+                         task_exact_heads={"DEC-01-T06": {"head": task_head}})
         H.git(self.repo, "add", "docs/sdlc/verify-evidence.json")
         H.git(self.repo, "commit", "-q", "-m", "record next task verification evidence")
         next_head = core.head(self.repo)

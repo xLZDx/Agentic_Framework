@@ -37,43 +37,16 @@ def _sha(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def _task_acceptance(project: Path, task_id: str) -> dict | None:
-    """Read an exact-head accepted-task record from the hashed verification evidence."""
-    try:
-        data = json.loads((core.state_dir(project) / evidence.FILE).read_text(encoding="utf-8"))
-        record = data.get("task_acceptance_records", {}).get(task_id)
-    except (OSError, ValueError, AttributeError):
-        return None
-    if (
-        not isinstance(record, dict)
-        or record.get("status") != "ACCEPTED"
-        or record.get("correlated") is not True
-        or not all(isinstance(record.get(key), str) and record[key].strip() for key in
-                   ("accepted_head", "request_id", "reply_id", "bridge_job_id"))
-    ):
-        return None
-    return record
-
-
 def _valid_task_scope(project: Path, scope: dict, candidate_head: str, sprint_base_sha: str) -> bool:
-    """Require an accepted predecessor and a range containing only the recorded task plus SDLC evidence."""
+    """Require a PM-approved base and a range containing only the recorded task plus SDLC evidence."""
     if (
         scope.get("type") != "task"
         or not isinstance(scope.get("id"), str) or not scope["id"].strip()
-        or not isinstance(scope.get("predecessor_task"), str)
+        or not isinstance(scope.get("predecessor_task"), str) or not scope["predecessor_task"].strip()
         or not all(isinstance(scope.get(key), str) and scope[key].strip() for key in
-                   ("base_sha", "task_head", "predecessor_head", "predecessor_request_id", "predecessor_reply_id", "predecessor_job_id"))
+                   ("base_sha", "task_head"))
         or not isinstance(candidate_head, str) or not candidate_head
         or not isinstance(sprint_base_sha, str) or not sprint_base_sha
-    ):
-        return False
-    predecessor = _task_acceptance(project, scope["predecessor_task"])
-    if (
-        predecessor is None
-        or predecessor.get("accepted_head") != scope.get("predecessor_head")
-        or predecessor.get("request_id") != scope.get("predecessor_request_id")
-        or predecessor.get("reply_id") != scope.get("predecessor_reply_id")
-        or predecessor.get("bridge_job_id") != scope.get("predecessor_job_id")
     ):
         return False
     try:
@@ -87,7 +60,7 @@ def _valid_task_scope(project: Path, scope: dict, candidate_head: str, sprint_ba
     except (OSError, ValueError, KeyError, TypeError, AttributeError, RuntimeError):
         return False
     if (
-        base != predecessor["accepted_head"]
+        base != scope["base_sha"]
         or task_head != recorded_task_head
         or scope.get("sprint_base_sha") != sprint_base_sha
         or subprocess.run(["git", "-C", str(project), "merge-base", "--is-ancestor", sprint_base_sha, base]).returncode != 0
@@ -140,13 +113,14 @@ def build_packet(
             "\n## Explicit task-scoped review\n"
             f"Task: {task_scope['id']}\n"
             f"Task diff base: {task_scope['base_sha']}\n"
-            f"Accepted predecessor: {task_scope['predecessor_task']} at {task_scope['predecessor_head']} "
-            f"(request/reply {task_scope['predecessor_request_id']} / {task_scope['predecessor_reply_id']})\n"
+            f"Previous task label: {task_scope['predecessor_task']}\n"
+            f"Review base: {task_scope['base_sha']} (must have a valid official PM approval)\n"
             f"Current task implementation HEAD: {task_scope['task_head']}\n"
             "Review only the concrete task delta from this base through the exact HEAD above. "
             "This request does not claim review or approval of changes outside that range. "
-            "The correlated predecessor acceptance and current task evidence below provide context; "
-            "do not expand the code-review scope to the cumulative sprint diff."
+            "The task labels and task-head evidence are scope metadata, not acceptance proof. "
+            "The review base is trusted only through the validated official PM approval at that exact HEAD. "
+            "Do not expand the code-review scope to the cumulative sprint diff."
         )
     names = ["verify-evidence.json", "verify-evidence.md", "review-record.md", "test-plan.md",
              "requirements.md", "backlog.md", "design.md"]
@@ -322,6 +296,7 @@ def _valid_approval_record(
     expected_previous: dict | None,
     expected_chain: list[dict],
     historical: bool,
+    allow_current_head: bool = False,
 ) -> tuple[bool, bytes | None]:
     if not isinstance(approval, dict) or "approval_chain" in approval:
         return False, None
@@ -341,6 +316,8 @@ def _valid_approval_record(
         not isinstance(task_scope, dict)
         or task_scope.get("base_sha") != base_sha
         or not _valid_task_scope(project, task_scope, head, sprint_base_sha)
+        or expected_previous is None
+        or expected_previous.get("head") != base_sha
     ):
         return False, None
     if (
@@ -353,7 +330,7 @@ def _valid_approval_record(
         or recorded_sprint_base != sprint_base_sha
         or base_sha != expected_base_sha
         or previous_link != expected_link
-        or head == current_head
+        or (head == current_head and not allow_current_head)
     ):
         return False, None
     if subprocess.run(["git", "-C", str(project), "merge-base", "--is-ancestor", base_sha, head]).returncode != 0:
@@ -449,6 +426,7 @@ def _previous_approval_from(
     evidence_sources: list[Path],
     sprint_base_sha: str,
     head_sha: str,
+    allow_current_head: bool = False,
 ) -> dict | None:
     """Return the last approval only if its complete chain verifies to the sprint baseline."""
     jpath, mpath = _paths(approval_source, "code")
@@ -478,6 +456,7 @@ def _previous_approval_from(
         valid, markdown = _valid_approval_record(
             project, evidence_sources, record, sprint_base_sha, sprint_id,
             head_sha, expected_base, previous, records[:index], index < len(records) - 1,
+            allow_current_head and index == len(records) - 1,
         )
         if not valid:
             return None
@@ -595,10 +574,6 @@ def request(project: Path, kind: str, base: str, node: str = "node", project_id:
         if not in_sprint or not before_head:
             print("REFUSED: task review base must be in the sprint ancestry and before HEAD.")
             return 2
-        predecessor = _task_acceptance(project, predecessor_task.strip())
-        if predecessor is None or predecessor["accepted_head"] != task_base_sha:
-            print("REFUSED: task base lacks a correlated accepted predecessor record at that exact HEAD.")
-            return 2
         try:
             evidence_data = json.loads((sd / evidence.FILE).read_text(encoding="utf-8"))
             task_record = evidence_data.get("task_exact_heads", {}).get(task_id.strip())
@@ -609,7 +584,7 @@ def request(project: Path, kind: str, base: str, node: str = "node", project_id:
         task_after_base = subprocess.run(["git", "-C", str(project), "merge-base", "--is-ancestor", task_base_sha, task_head]).returncode == 0
         task_before_head = subprocess.run(["git", "-C", str(project), "merge-base", "--is-ancestor", task_head, head_sha]).returncode == 0
         if not task_after_base or not task_before_head:
-            print("REFUSED: recorded implementation HEAD is outside the accepted-predecessor-to-candidate range.")
+            print("REFUSED: recorded implementation HEAD is outside the PM-approved-base-to-candidate range.")
             return 2
         task_paths = set(core.git(project, "diff", "--name-only", f"{task_base_sha}...{task_head}").splitlines())
         candidate_paths = set(core.git(project, "diff", "--name-only", f"{task_base_sha}...{head_sha}").splitlines())
@@ -618,17 +593,13 @@ def request(project: Path, kind: str, base: str, node: str = "node", project_id:
         ):
             print("REFUSED: scoped range has changes outside the recorded task delta and its SDLC evidence.")
             return 2
-        if previous and previous["head"] != task_base_sha:
-            print("REFUSED: a valid predecessor approval exists at a different HEAD than --task-base.")
+        if previous is None or previous["head"] != task_base_sha:
+            print("REFUSED: task-scoped review requires a valid correlated PM approval at the exact --task-base HEAD.")
             return 2
         review_base = task_base_sha
         task_scope = {
             "type": "task", "id": task_id.strip(), "base_sha": task_base_sha,
             "task_head": task_head, "predecessor_task": predecessor_task.strip(),
-            "predecessor_head": predecessor["accepted_head"],
-            "predecessor_request_id": predecessor["request_id"],
-            "predecessor_reply_id": predecessor["reply_id"],
-            "predecessor_job_id": predecessor["bridge_job_id"],
         }
     else:
         if task_id or predecessor_task:
@@ -766,7 +737,12 @@ def verify(project: Path, kind: str = "code") -> tuple[bool, str]:
             or _sha(diff) != a.get("diff_sha256")
             or not _valid_approval_markdown(markdown, a)
         ):
-            return False, "task approval scope does not match its accepted predecessor and exact Git range"
+            return False, "task approval scope does not match its PM-approved base and exact Git range"
+        chain = _previous_approval_from(
+            project, project, [project], sprint_base_sha, cur, allow_current_head=True,
+        )
+        if chain is None or chain.get("head") != cur:
+            return False, "task approval lacks a validated PM approval chain rooted at its exact predecessor HEAD"
     if not (a.get("request_id") and a.get("reply_id")):
         return False, "approval lacks correlated ids"
     if not mpath.is_file() or a["head"] not in mpath.read_text(encoding="utf-8"):
